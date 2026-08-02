@@ -122,7 +122,10 @@
 
 .reader-content__body--columns {
   height: 100%;
-  padding: 24px 0 48px;
+  padding:
+    calc(24px + var(--reader-safe-area-top, env(safe-area-inset-top, 0px)))
+    0
+    calc(48px + var(--reader-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
   column-fill: auto;
   box-sizing: border-box;
 }
@@ -139,7 +142,11 @@
 }
 
 .reader-content--vertical .reader-content__body {
-  padding: 20px 24px 20px;
+  padding:
+    calc(20px + var(--reader-safe-area-top, env(safe-area-inset-top, 0px)))
+    calc(24px + var(--reader-safe-area-right, env(safe-area-inset-right, 0px)))
+    calc(20px + var(--reader-safe-area-bottom, env(safe-area-inset-bottom, 0px)))
+    calc(24px + var(--reader-safe-area-left, env(safe-area-inset-left, 0px)));
 }
 
 .reader-content__body p {
@@ -204,7 +211,11 @@
 }
 
 .reader-chapter-btn-slot--next {
-  padding: 24px 24px 20px;
+  padding:
+    24px
+    calc(24px + var(--reader-safe-area-right, env(safe-area-inset-right, 0px)))
+    calc(20px + var(--reader-safe-area-bottom, env(safe-area-inset-bottom, 0px)))
+    calc(24px + var(--reader-safe-area-left, env(safe-area-inset-left, 0px)));
   text-align: center;
 }
 
@@ -284,7 +295,11 @@
 
 /* ── 骨架屏（章节加载占位） ── */
 .reader-content__skeleton {
-  padding: 20px 24px;
+  padding:
+    calc(20px + var(--reader-safe-area-top, env(safe-area-inset-top, 0px)))
+    calc(24px + var(--reader-safe-area-right, env(safe-area-inset-right, 0px)))
+    calc(20px + var(--reader-safe-area-bottom, env(safe-area-inset-bottom, 0px)))
+    calc(24px + var(--reader-safe-area-left, env(safe-area-inset-left, 0px)));
 }
 
 .reader-content__skeleton-line {
