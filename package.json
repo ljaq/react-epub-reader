@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @react-epub-reader/h5-demo dev",
+    "dev:webview": "pnpm --filter @react-epub-reader/webview-bundle dev",
     "build": "pnpm -r run build",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",

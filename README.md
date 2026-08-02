@@ -19,6 +19,7 @@
 | 富媒体 | 图片预览、脚注 Popover、正文链接 `onLinkClick` |
 | 书籍 CSS | 宿主 `bookMeta` 含外部 CSS 时自动注入与同步 |
 | EPUB | `@react-epub-reader/epub-adapter` 解析 spine → 统一章节契约 |
+| WebView Bundle | 编译为 `html/css/js`，嵌入 RN / Flutter WebView，JSON 协议双向通信 |
 | 业务插槽 | 随感等通过 `chromeSlots` 注入，reader 包零内置业务 |
 
 ---
@@ -29,6 +30,7 @@
 react-epub-reader/
 ├── packages/reader/          # 阅读器库（零 fetch / 零路由 / 零 USE_MOCK）
 ├── packages/epub-adapter/    # epub.js → ChapterMeta / ChapterContent
+├── packages/webview-bundle/  # WebView 静态包 + Native bridge 协议
 ├── apps/h5-demo/             # 集成示例：Mock API、ReaderHost、随感、EPUB 调试
 └── plans/                    # 契约、Phase 计划、验收看板
 ```
@@ -37,6 +39,7 @@ react-epub-reader/
 |---|---|---|
 | `packages/reader` | `@react-epub-reader/reader` | `<Reader />` 组件 + 全部阅读能力 |
 | `packages/epub-adapter` | `@react-epub-reader/epub-adapter` | EPUB 加载、章节 HTML、资源 rewrite |
+| `packages/webview-bundle` | `@react-epub-reader/webview-bundle` | 构建可嵌入 App WebView 的静态 bundle + JSON bridge |
 | `apps/h5-demo` | `@react-epub-reader/h5-demo` | 宿主参考实现：API、路由、ReaderHost |
 
 ---
@@ -96,6 +99,27 @@ pnpm dev
 
 Mock 示例书 **第二章** 含富媒体（图片 / 脚注 / 外链），适合 smoke 测试。
 
+### 本地运行（webview-bundle）
+
+面向 App WebView 集成的静态包，独立 dev server：
+
+```bash
+pnpm dev:webview
+```
+
+浏览器打开 **http://localhost:5174**，在控制台手动注入 EPUB：
+
+```javascript
+window.__EpubReader.dispatch(JSON.stringify({
+  v: 1,
+  type: 'loadEpub',
+  payload: {
+    bookId: 1,
+    source: { kind: 'url', data: '/sample.epub' }
+  }
+}))
+```
+
 ### 环境变量
 
 在 `apps/h5-demo` 下创建 `.env`（可选）：
@@ -112,10 +136,11 @@ Mock 公共参数（与 Vue 一致）：`rentId=105883`、`appId=13673ce1`（见
 ## 构建与测试
 
 ```bash
-pnpm -r run build    # 三包构建
+pnpm -r run build    # 四包构建（含 webview-bundle dist）
 pnpm -w test         # 162 项单测（reader + epub-adapter）
 pnpm lint            # oxlint
 pnpm preview         # 预览 h5-demo 生产构建
+pnpm dev:webview     # 开发 webview-bundle（:5174）
 ```
 
 ---
@@ -190,6 +215,98 @@ const content = await adapter.getChapterContent(chapterId)
 
 ---
 
+## 嵌入 App WebView（webview-bundle）
+
+`packages/webview-bundle` 将 reader + epub-adapter + bridge 打成 **单份静态资源**，供 React Native / Flutter WebView 直接加载，无需 App 侧再装 React 依赖。
+
+### 构建产物
+
+```bash
+pnpm --filter @react-epub-reader/webview-bundle build
+```
+
+```
+packages/webview-bundle/dist/
+├── index.html
+└── assets/
+    ├── index-*.js    # 含 reader + epub-adapter + bridge
+    └── index-*.css   # reader 样式
+```
+
+将 `dist/` 打入 App assets（RN：`file:///android_asset/webview/index.html`；Flutter：`assets/webview/index.html`）。
+
+### 通信架构
+
+协议与传输分离：WebView 内只认统一 JSON 格式；RN / Flutter 各用薄适配层对接。
+
+| 方向 | 机制 |
+|---|---|
+| App → WebView | `window.__EpubReader.dispatch(jsonString)`（RN `injectJavaScript` / Flutter `runJavaScript`） |
+| WebView → App | 自动探测 `ReactNativeWebView.postMessage` / `EpubReaderBridge` / `flutter_inappwebview.callHandler` |
+
+```mermaid
+sequenceDiagram
+  participant App as RN_or_Flutter
+  participant Bridge as window.__EpubReader
+  participant Reader as Reader
+
+  App->>Bridge: dispatch(loadEpub / updateLines / ...)
+  Bridge->>Reader: 更新 Props
+  Reader->>Bridge: lineCreate / readingPositionChange / ...
+  Bridge->>App: postMessage / JavascriptChannel
+```
+
+### 常用命令（App → WebView）
+
+| type | 用途 |
+|---|---|
+| `loadEpub` | 加载 EPUB（`source.kind`: `url` 或 `base64`） |
+| `epubChunk` | 大文件分片传输 |
+| `updateLines` / `updateNotes` / `updateBookmarks` | 注入或更新标注 |
+| `injectTtsAudio` | TTS 音频回注（响应 `ttsAudioRequest` 事件） |
+| `signalAnnotationFailure` | 标注保存失败，触发 DOM rollback |
+| `updateUser` | 更新登录 / 书架态 |
+| `destroy` | 卸载当前书籍 |
+
+WebView 会将 Reader 全部回调映射为事件上报 App，包括 `lineCreate`、`readingPositionChange`、`ttsAudioRequest`、`navigate`（随感等）等。
+
+### 集成示例
+
+**React Native**（[`examples/rn-bridge.ts`](packages/webview-bundle/examples/rn-bridge.ts)）：
+
+```tsx
+import { createRnBridge, parseBridgeMessage } from './rn-bridge'
+
+const ref = useRef<WebView>(null)
+const bridge = createRnBridge(ref)
+
+<WebView
+  ref={ref}
+  source={{ uri: 'file:///android_asset/webview/index.html' }}
+  onMessage={(e) => {
+    const msg = parseBridgeMessage(e.nativeEvent.data)
+    if (msg?.type === 'lineCreate') { /* 调 API 保存 */ }
+  }}
+  onLoadEnd={() => bridge.loadEpub(epubFileUrl)}
+/>
+```
+
+**Flutter**（[`examples/flutter_bridge.dart`](packages/webview-bundle/examples/flutter_bridge.dart)）：
+
+```dart
+controller.addJavaScriptChannel('EpubReaderBridge',
+  onMessageReceived: (msg) => _handleBridge(msg.message));
+await controller.loadFlutterAsset('assets/webview/index.html');
+await controller.runJavaScript(
+  "window.__EpubReader.dispatch('${jsonEncode(loadEpubCmd)}')");
+```
+
+完整协议与 payload 字段见 [`packages/webview-bundle/docs/PROTOCOL.md`](packages/webview-bundle/docs/PROTOCOL.md)。
+
+> **大文件建议**：Native 先将 EPUB 写入 App 沙盒，再发 `loadEpub` 传 `file://` URL；超大文件可用 `epubChunk` 分片拼接。
+
+---
+
 ## 插槽示例（随感入口）
 
 ```tsx
@@ -246,4 +363,5 @@ const content = await adapter.getChapterContent(chapterId)
 - [总览与契约](plans/00-总览与契约.md)
 - [迁移状态看板](plans/STATUS.md)
 - [阅读器库文档](packages/reader/README.md)
+- [WebView Bridge 协议](packages/webview-bundle/docs/PROTOCOL.md)
 - [Plans 工作流](plans/README.md)
