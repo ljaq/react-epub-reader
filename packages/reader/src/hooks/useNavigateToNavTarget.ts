@@ -221,20 +221,19 @@ export function useInitialPositionRestore(options: {
   const { initialPosition, consumedRef } = options
   const bufferReady = useReadingStore((s) => s.bufferReady)
   const initialLayoutSettled = useReadingStore((s) => s.initialLayoutSettled)
-  const bootContentReady = useReadingStore((s) => s.bootContentReady)
 
   useEffect(() => {
-    if (bootContentReady) return
+    if (useReadingStore.getState().bootContentReady) return
     if (!bufferReady || !initialLayoutSettled) return
     if (consumedRef.current) return
 
     let cancelled = false
+    let lockedLayout = false
     consumedRef.current = true
 
     async function revealAfterRestore(): Promise<void> {
-      const store = useReadingStore.getState()
-      // 还原 + 邻居预取合并期间锁 layout：transition=none，遮罩盖住
-      store.setLayoutLocked(true)
+      useReadingStore.getState().setLayoutLocked(true)
+      lockedLayout = true
       try {
         if (initialPosition?.chapterId) {
           const navTarget = navTargetFromReadingSnapshot(initialPosition)
@@ -242,13 +241,13 @@ export function useInitialPositionRestore(options: {
           await applyNavTargetWithRetry()
         }
 
-        // 等 ±1 邻居章 silentExpand 完成；此前揭开会看到 track 重定位动画
         await waitFor(() => {
           const { buffer } = useReadingStore.getState()
           return !buffer.loading && !buffer.silentExpand
         }, { timeoutMs: 2500 })
 
-        // 邻居合并后页序可能变化，再无动画对齐一次
+        if (cancelled) return
+
         if (initialPosition?.chapterId) {
           const navTarget = navTargetFromReadingSnapshot(initialPosition)
           useReadingStore.getState().setNavTarget({
@@ -259,13 +258,15 @@ export function useInitialPositionRestore(options: {
         }
 
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))))
-      } finally {
         if (cancelled) return
-        const next = useReadingStore.getState()
-        // 先揭开遮罩（淡出），淡出期间仍锁 transition
-        next.markBootContentReady()
+
+        // 横划淡出由 HorizontalReader 本地 overlay 禁 transition；此处先解锁再 mark，避免 deps 触发 cleanup 卡死 layoutLocked
+        useReadingStore.getState().setLayoutLocked(false)
+        lockedLayout = false
+        useReadingStore.getState().markBootContentReady()
         await new Promise((r) => setTimeout(r, BOOT_LOADING_FADE_MS))
-        if (!cancelled) {
+      } finally {
+        if (lockedLayout) {
           useReadingStore.getState().setLayoutLocked(false)
         }
       }
@@ -274,6 +275,8 @@ export function useInitialPositionRestore(options: {
     void revealAfterRestore()
     return () => {
       cancelled = true
+      useReadingStore.getState().setLayoutLocked(false)
     }
-  }, [initialPosition, bufferReady, initialLayoutSettled, bootContentReady, consumedRef])
+    // 勿将 bootContentReady 列入 deps：markBootContentReady 会触发 cleanup 导致 layoutLocked 无法释放
+  }, [initialPosition, bufferReady, initialLayoutSettled, consumedRef])
 }
