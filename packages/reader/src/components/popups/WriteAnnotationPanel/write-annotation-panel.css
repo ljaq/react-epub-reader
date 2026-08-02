@@ -1,0 +1,102 @@
+/**
+ * 写批注面板样式 — 对照 old-vue-reader/components/WriteAnnotationPanel/index.vue SCSS
+ */
+.write-annotation-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 10060;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.write-annotation-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.write-annotation-panel__back-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.write-annotation-panel__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: #1a1a1a;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+.write-annotation-panel__title {
+  color: #1a1a1a;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.write-annotation-panel__publish {
+  border: none;
+  min-width: 56px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: #fff;
+  color: #1680fc;
+  font-size: 14px;
+  line-height: 28px;
+  cursor: pointer;
+  border: 1px solid #1680fc;
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+.write-annotation-panel__publish--disabled,
+.write-annotation-panel__publish:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.write-annotation-panel__body {
+  flex: 1;
+  padding: 16px 24px 24px;
+  overflow-y: auto;
+}
+
+.write-annotation-panel__quote {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f5f5f5;
+  color: #999999;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.write-annotation-panel__input {
+  display: block;
+  width: 100%;
+  min-height: 200px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: #1a1a1a;
+  font-size: 16px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+
+.write-annotation-panel__input::placeholder {
+  color: #cccccc;
+}

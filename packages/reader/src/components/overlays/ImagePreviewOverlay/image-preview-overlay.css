@@ -1,0 +1,21 @@
+.reader-image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background-color: #222222;
+  transform: scale(0);
+  transition: transform 0.3s;
+  pointer-events: none;
+}
+
+.reader-image-preview--visible {
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.reader-image-preview__img {
+  position: relative;
+  width: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+}

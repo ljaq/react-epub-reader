@@ -1,0 +1,381 @@
+/**
+ * 阅读引擎内容区样式 — 逐字对照 old-vue-reader/components/ReaderContent/index.vue <style>。
+ *
+ * 仅迁移 Phase 2 阅读引擎所需：viewport / track / segment / body / 章节导航按钮 / 加载态。
+ * 选中/划线/批注/脚注/图片预览相关样式归 Phase 4，此处不迁。
+ */
+
+.reader-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+.reader-content--horizontal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.reader-content--vertical {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.reader-content--vertical.reader-content--chapter-loading {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.reader-content__viewport-h {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 0;
+  touch-action: none;
+  background: var(--reader-bg);
+}
+
+.reader-content__viewport-h--initializing {
+  visibility: hidden;
+}
+
+.reader-content__track {
+  display: flex;
+  height: 100%;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.reader-content__segment {
+  flex: none;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 翻页阴影：每页右侧内边缘渐变阴影（对照 novel-reader inset -4px 0 12px），
+   跟着 segment（track）滚动，充满整页高度。
+   阴影在 pageWidth 前 8px 向左渐变，确保最后一页（segment 右边缘）阴影也在内可见。
+   仅 is-flipping（拖拽 + 翻页动画）时显示，不翻页时无阴影。 */
+.reader-content__segment::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease-out;
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--page-width, 0px) - 8px),
+    rgba(0, 0, 0, 0) calc(var(--page-width, 0px) - 8px),
+    rgba(0, 0, 0, 0.05) calc(var(--page-width, 0px) - 1px),
+    rgba(0, 0, 0, 0) var(--page-width, 0px),
+    transparent var(--page-stride, 0px)
+  );
+}
+
+.reader-content__segment.is-flipping::after {
+  opacity: 1;
+}
+
+.reader-content__viewport-v {
+  position: relative;
+  min-height: 100%;
+}
+
+.reader-content__vertical-wrap {
+  position: relative;
+}
+
+.reader-content__body {
+  box-sizing: border-box;
+  font-size: var(--reader-font-size);
+  font-weight: var(--reader-font-weight);
+  line-height: var(--reader-line-height);
+  color: var(--reader-color);
+  word-break: break-word;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+.reader-content__body::selection,
+.reader-content__body *::selection {
+  background: transparent;
+  color: inherit;
+}
+
+.reader-content__body--columns {
+  height: 100%;
+  padding: 24px 0 48px;
+  column-fill: auto;
+  box-sizing: border-box;
+}
+
+/* 横划模式 column 充满屏幕宽度，内容左右留白通过块级元素 padding 实现
+   （而非 body--columns padding，否则 column 缩小、阴影不对齐屏幕边缘） */
+.reader-content__body--columns p,
+.reader-content__body--columns h1,
+.reader-content__body--columns h2,
+.reader-content__body--columns h3,
+.reader-content__body--columns li {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.reader-content--vertical .reader-content__body {
+  padding: 20px 24px 20px;
+}
+
+.reader-content__body p {
+  margin-bottom: 1em;
+  line-height: 1.75em;
+}
+
+.reader-content__body .h5_mainbody {
+  text-align: justify;
+  text-indent: 2em;
+}
+
+.reader-content__body a {
+  word-break: break-all;
+}
+
+.reader-content__body.read_c::before {
+  content: '';
+  clear: both;
+  display: block;
+}
+
+.reader-content__body
+  img:not(.firstletter):not(.zhangyue-img-h1):not(.zhangyue-footnote):not(.zhangyue-footnote-s) {
+  max-width: 100%;
+  height: auto;
+  width: auto;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+  max-height: 90vh;
+  cursor: pointer;
+}
+
+.reader-content__body .chatu_img img {
+  display: inline-block;
+}
+
+.reader-content__body svg {
+  max-width: 100%;
+  width: auto;
+  max-height: 90vh;
+}
+
+@media (orientation: landscape) {
+  .reader-content__body img:not(.firstletter):not(.zhangyue-img-h1),
+  .reader-content__body svg {
+    max-height: 70vh;
+  }
+
+  .reader-content__body svg {
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+  }
+}
+
+/* ── 章首 pill「上一章」/ 章末通栏「下一章」按钮（对照 index.vue:2554-2585） ── */
+.reader-chapter-btn-slot--prev {
+  padding: 12px 24px 0;
+  text-align: left;
+}
+
+.reader-chapter-btn-slot--next {
+  padding: 24px 24px 20px;
+  text-align: center;
+}
+
+.reader-chapter-btn {
+  border: none;
+  background: var(--reader-chapter-btn-bg, rgba(0, 0, 0, 0.05));
+  color: var(--reader-chapter-btn-color, #1680fc);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reader-chapter-btn--prev {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 999px;
+}
+
+.reader-chapter-btn--next {
+  display: block;
+  width: 100%;
+  padding: 12px 0;
+  border-radius: 999px;
+}
+
+.reader-chapter-btn--next[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── 章节加载态（对照 index.vue:2475-2501） ── */
+.reader-content__chapter-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity 0.28s ease-out;
+}
+
+.reader-content__chapter-loading.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reader-content__chapter-loading-mask {
+  position: absolute;
+  inset: 0;
+  background: var(--reader-bg, #ffffff);
+}
+
+.reader-content__chapter-loading-spinner {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--reader-color, #1a1a1a);
+  border-radius: 50%;
+  animation: reader-chapter-loading-spin 0.8s linear infinite;
+}
+
+/* 淡出时勿 animation:none —— 会把旋转瞬间重置到 0°，图标会闪回初始角度 */
+.reader-content__chapter-loading.is-leaving .reader-content__chapter-loading-spinner {
+  animation-play-state: paused;
+}
+
+@keyframes reader-chapter-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── 骨架屏（章节加载占位） ── */
+.reader-content__skeleton {
+  padding: 20px 24px;
+}
+
+.reader-content__skeleton-line {
+  height: 16px;
+  margin-bottom: 14px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.reader-content__skeleton-line--short {
+  width: 60%;
+}
+
+.reader-content--vertical.reader-content--theme-dark .reader-content__skeleton-line {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Phase 4：划线/批注 DOM 高亮（对照 index.vue:2623-2687） ── */
+.reader-content__body .reader-line-mark {
+  display: inline;
+  cursor: pointer;
+  color: var(--reader-color);
+}
+
+.reader-content__body .reader-line-mark--background {
+  background-color: rgba(255, 157, 0, 0.3);
+}
+
+.reader-content__body .reader-line-mark--underline {
+  background-color: transparent !important;
+  border-bottom: 2px solid #0080ff;
+}
+
+.reader-content__body .reader-note-mark {
+  border-bottom: 1px dashed #ff9d00;
+  background: none;
+  color: var(--reader-color);
+  cursor: pointer;
+}
+
+.reader-content__note-badges {
+  z-index: 1;
+  pointer-events: none;
+}
+
+.reader-content__note-badges--scroll {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.reader-content__note-badges--fixed {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+}
+
+.reader-content__note-badges--scroll .reader-note-badge {
+  position: absolute;
+  right: 3px;
+}
+
+.reader-content__note-badges--fixed .reader-note-badge {
+  position: fixed;
+  right: 3px;
+}
+
+.reader-content__note-badges .reader-note-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.reader-content__bookmark-badge {
+  position: absolute;
+  top: 0;
+  right: 16px;
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  pointer-events: none;
+}

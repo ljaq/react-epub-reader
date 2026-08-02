@@ -1,7 +1,9 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.app.json" },
+    { "path": "./packages/reader/tsconfig.json" },
+    { "path": "./packages/epub-adapter/tsconfig.json" },
+    { "path": "./apps/h5-demo/tsconfig.json" },
     { "path": "./tsconfig.node.json" }
   ]
 }

@@ -1,0 +1,90 @@
+/**
+ * 批注列表弹层样式 — 对照 old-vue-reader/components/AnnotationListPopup/index.vue SCSS
+ */
+.annotation-list-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 10055;
+  background: rgba(0, 0, 0, 0.5);
+  animation: annotation-list-popup-fade-in 0.28s ease;
+}
+
+.annotation-list-popup__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 40px 24px 80px;
+  box-sizing: border-box;
+  animation: annotation-list-popup-slide-in 0.28s ease;
+}
+
+.annotation-list-popup__content {
+  width: 100%;
+  height: calc(100% - 80px);
+  overflow-y: auto;
+}
+
+.annotation-list-popup__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.annotation-list-popup__item {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.annotation-list-popup__text {
+  margin: 0;
+  color: #ffffff;
+  font-size: 14px;
+  margin-bottom: 5px;
+  word-break: break-word;
+}
+
+.annotation-list-popup__time {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+.annotation-list-popup__close {
+  position: fixed;
+  bottom: 48px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  cursor: pointer;
+  transform: translateX(-50%);
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+@keyframes annotation-list-popup-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes annotation-list-popup-slide-in {
+  from {
+    transform: translateY(100px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}

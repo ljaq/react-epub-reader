@@ -1,0 +1,283 @@
+/**
+ * 目录弹窗样式 — 逐字对照 old-vue-reader/components/CatalogPopup/index.vue <style>。
+ * 弹层 78vh，底部 sheet，圆角顶部。
+ */
+
+.catalog-popup-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.catalog-popup-mask--tts {
+  z-index: 10003;
+}
+
+.catalog-popup-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  height: 78vh;
+  max-height: 78vh;
+  overflow: hidden;
+  background: #ffffff;
+  color: #1a1a1a;
+  border-radius: 16px 16px 0 0;
+  box-sizing: border-box;
+}
+
+.catalog-popup {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.catalog-popup__header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 50px;
+  padding: 0 16px;
+}
+
+.catalog-popup__close {
+  position: absolute;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.catalog-popup__close-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.catalog-popup__title {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.catalog-popup__book {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.catalog-popup__cover-wrapper {
+  flex-shrink: 0;
+  width: 50px;
+  position: relative;
+}
+
+.catalog-popup__cover-wrapper::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 2px;
+}
+
+.catalog-popup__cover {
+  flex-shrink: 0;
+  width: 50px;
+  height: 67px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: #f0f0f0;
+  display: block;
+}
+
+.catalog-popup__book-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.catalog-popup__book-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalog-popup__book-author,
+.catalog-popup__book-read {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.catalog-popup__book-arrow {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: rgba(0, 0,  0, 0.55);
+}
+
+.catalog-popup__range-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 8px 20px;
+}
+
+.catalog-popup__total {
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.catalog-popup__range-wrap {
+  position: relative;
+}
+
+.catalog-popup__range-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+
+.catalog-popup__range-trigger svg {
+  flex-shrink: 0;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.catalog-popup__range-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 2;
+  min-width: 144px;
+  padding: 4px 0;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.1);
+}
+
+.catalog-popup__range-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.8;
+  color: rgba(0, 0, 0, 0.55);
+  text-align: left;
+  cursor: pointer;
+}
+
+.catalog-popup__range-item--active {
+  color: #1a1a1a;
+}
+
+.catalog-popup__range-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  flex-shrink: 0;
+  color: #1a1a1a;
+}
+
+.catalog-popup__list {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid #f0f0f0;
+}
+
+.catalog-popup__chapter {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0 20px;
+  height: 48px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.55);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.catalog-popup__chapter::after {
+  position: absolute;
+  content: '';
+  left: 20px;
+  right: 20px;
+  bottom: 0;
+  height: 1px;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.catalog-popup__chapter--active {
+  color: #1a1a1a;
+}
+
+.catalog-popup__chapter:last-child {
+  border-bottom: none;
+}
+
+.catalog-popup__empty {
+  padding: 24px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.45);
+  text-align: center;
+}

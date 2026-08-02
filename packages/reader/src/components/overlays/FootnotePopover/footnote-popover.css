@@ -1,0 +1,29 @@
+.reader-footnote {
+  position: fixed;
+  z-index: 5100;
+  padding: 16px;
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 7px;
+  background: #444444;
+  box-shadow: 0 0 15px 0 rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+.reader-footnote__text {
+  display: block;
+  word-break: break-word;
+}
+
+.reader-footnote__arr {
+  width: 12px;
+  height: 12px;
+  border-bottom: 1px solid #444444;
+  border-left: 1px solid #444444;
+  background: #444444;
+  transform: rotate(-45deg);
+  position: absolute;
+  left: 0;
+  bottom: -7px;
+}

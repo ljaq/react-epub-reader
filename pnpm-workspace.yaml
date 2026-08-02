@@ -1,3 +1,17 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
 allowBuilds:
   core-js: set this to true or false
   es5-ext: set this to true or false
+  esbuild: set this to true or false
+
+# 批准以下依赖运行构建脚本（esbuild 需 postinstall 链接原生绑定）
+onlyBuiltDependencies:
+  - esbuild
+  - core-js
+  - es5-ext
+
+# 关闭运行脚本前的依赖校验（避免 ignored builds 阻断 build）
+verifyDepsBeforeRun: false

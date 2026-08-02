@@ -1,0 +1,73 @@
+/**
+ * 章节访问码解析（10003 needLogin / 10004 needPurchase）。
+ *
+ * 源码对照：old-vue-reader/utils/chapter-access.js:1-37
+ */
+
+const CODE_OK = 0
+const CODE_NEED_LOGIN = 10003
+const CODE_NEED_PURCHASE = 10004
+
+export interface NextChapterAccessResult {
+  ok: boolean
+  needLogin: boolean
+  needPurchase: boolean
+}
+
+export interface CheckReadAccessResult {
+  ok: boolean
+  needLogin: boolean
+  canRead: boolean
+  isLoggedIn?: boolean
+}
+
+interface NextChapterResponse {
+  code?: number
+  html?: string
+  body?: { html?: string }
+}
+
+interface CheckReadResponse {
+  code?: number
+  body?: {
+    allFree?: boolean | number
+    isFree?: boolean | number
+    isLogin?: boolean | number
+  }
+}
+
+/** 解析 /nextchapter 响应码：10003→needLogin，10004→needPurchase，0+html→ok。对齐 Vue chapter-access.js:5 */
+export function parseNextChapterAccess(res: NextChapterResponse | null | undefined): NextChapterAccessResult {
+  const code = Number(res?.code)
+  if (code === CODE_NEED_LOGIN) {
+    return { ok: false, needLogin: true, needPurchase: false }
+  }
+  if (code === CODE_NEED_PURCHASE) {
+    return { ok: false, needLogin: false, needPurchase: true }
+  }
+  if (code === CODE_OK && (res?.html || res?.body?.html)) {
+    return { ok: true, needLogin: false, needPurchase: false }
+  }
+  return { ok: false, needLogin: false, needPurchase: false }
+}
+
+/** 解析 /checkread 响应：免费章→canRead，付费未登录→needLogin，付费已登录→canRead。对齐 Vue chapter-access.js:19 */
+export function parseCheckReadAccess(res: CheckReadResponse | null | undefined): CheckReadAccessResult {
+  if (!res || Number(res.code) !== CODE_OK || !res.body) {
+    return { ok: false, needLogin: false, canRead: false }
+  }
+
+  const { allFree, isFree, isLogin } = res.body
+  const isLoggedIn = Boolean(isLogin)
+  const chapterFree = Boolean(allFree) || Boolean(isFree)
+
+  if (chapterFree) {
+    return { ok: true, needLogin: false, canRead: true, isLoggedIn }
+  }
+
+  if (!isLoggedIn) {
+    return { ok: false, needLogin: true, canRead: false, isLoggedIn }
+  }
+
+  return { ok: true, needLogin: false, canRead: true, isLoggedIn }
+}

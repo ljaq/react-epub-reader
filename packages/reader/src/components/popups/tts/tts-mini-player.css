@@ -1,0 +1,122 @@
+.tts-mini-player {
+  position: absolute;
+  left: 16px;
+  bottom: calc(100% + 8px);
+  z-index: 95;
+  pointer-events: auto;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.18));
+}
+
+.tts-mini-player__pill {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 48px;
+  padding: 0 16px 0 0;
+  border-radius: 24px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  color: #fff;
+}
+
+.tts-mini-player__cover-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #e8e8e8;
+  cursor: pointer;
+}
+
+.tts-mini-player__cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  animation: tts-mini-player-cover 3.6s linear infinite;
+  animation-play-state: running;
+}
+
+.tts-mini-player__cover--paused {
+  animation-play-state: paused;
+}
+
+.tts-mini-player__cover--placeholder {
+  background: linear-gradient(145deg, #e8e8e8 0%, #d4d4d4 100%);
+}
+
+.tts-mini-player__progress-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.tts-mini-player__control,
+.tts-mini-player__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.tts-mini-player__control {
+  width: 20px;
+  height: 20px;
+}
+
+.tts-mini-player__control-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.tts-mini-player__control--loading {
+  pointer-events: none;
+}
+
+.tts-mini-player__loading {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  animation: tts-mini-play-loading 1.6s linear infinite;
+}
+
+.tts-mini-player__close {
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
+.tts-mini-player__close-icon {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes tts-mini-player-cover {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes tts-mini-play-loading {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
