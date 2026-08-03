@@ -9,6 +9,7 @@ import { useTtsHighlightFollow } from '../../../hooks/useTtsHighlightFollow'
 import { useTtsSession } from '../../../hooks/useTtsSession'
 import { useTtsStore } from '../../../store/tts-store'
 import { useUiStore } from '../../../store/ui-store'
+import { TtsPlayPositionConfirmHost } from './confirmTtsPlayPosition'
 import { registerTtsSessionActions, unregisterTtsSessionActions } from './tts-actions'
 import { TtsPopup } from './TtsPopup'
 import { TtsReturnBar } from './TtsReturnBar'
@@ -115,6 +116,7 @@ export function TtsLayer(props: TtsLayerProps): React.ReactNode {
       />
 
       <TtsReturnBar onReturn={() => void scrollToTtsSegment()} />
+      <TtsPlayPositionConfirmHost />
     </>
   )
 }

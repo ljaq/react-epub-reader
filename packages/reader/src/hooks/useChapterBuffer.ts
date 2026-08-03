@@ -32,7 +32,6 @@ import {
   mergeBufferContents,
   rebuildSegmentOffsets,
   shouldRebalanceBuffer,
-  shouldSkipPaidPrefetch,
   type ChapterBuffer,
   type FetchedChapterContent
 } from '../core/chapter-buffer'

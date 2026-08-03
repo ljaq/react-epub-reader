@@ -3,24 +3,30 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
+      "@react-epub-reader/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "prepare": "node ./scripts/ensure-dist.mjs",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "epubjs": "^0.3.93"
   },
   "peerDependencies": {
-    "@react-epub-reader/reader": "workspace:*"
+    "@react-epub-reader/reader": ">=0.0.0"
   },
   "devDependencies": {
     "@react-epub-reader/reader": "workspace:*"

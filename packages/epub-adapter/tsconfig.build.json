@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.adapter.build.tsbuildinfo"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.test.tsx"]
+}
