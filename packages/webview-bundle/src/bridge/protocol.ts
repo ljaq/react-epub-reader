@@ -5,9 +5,13 @@ import type {
   AnnotationFailureSignal,
   BookmarkItem,
   BookMeta,
+  ChapterAccess,
+  ChapterContent,
+  ChapterLoadState,
   ChapterMeta,
   LineItem,
   NoteItem,
+  ReaderUser,
   ReadingSnapshot,
   TtsVoiceType,
 } from '@react-epub-reader/reader'
@@ -26,6 +30,9 @@ export interface BridgeMessage<T = unknown> {
 export const INBOUND_TYPES = {
   loadEpub: 'loadEpub',
   epubChunk: 'epubChunk',
+  loadBook: 'loadBook',
+  injectChapter: 'injectChapter',
+  updateChapterAccess: 'updateChapterAccess',
   updateLines: 'updateLines',
   updateNotes: 'updateNotes',
   updateBookmarks: 'updateBookmarks',
@@ -59,6 +66,36 @@ export interface EpubChunkPayload {
   data: string
   /** 最后一个 chunk 携带完整 loadEpub 参数 */
   loadOptions?: Omit<LoadEpubPayload, 'source'> & { source?: never }
+}
+
+/** API 模式 bootstrap — App 请求后端后注入 */
+export interface LoadBookPayload {
+  bookId: number
+  bookMeta: BookMeta
+  chapterList: ChapterMeta[]
+  chapterAccess: Record<number, ChapterAccess>
+  chapters: Record<number, ChapterContent>
+  chapterLoadStates: Record<number, ChapterLoadState>
+  lines?: Record<number, Record<string, LineItem>>
+  notes?: Record<number, Record<string, NoteItem>>
+  bookmarks?: Record<number, BookmarkItem[]>
+  user?: ReaderUser
+  ttsVoiceTypes?: TtsVoiceType[]
+  initialChapterId?: number
+  initialPosition?: ReadingSnapshot
+}
+
+/** API 模式按需注入单章 — 响应 chapterChange / prefetch */
+export interface InjectChapterPayload {
+  chapterId: number
+  content?: ChapterContent
+  access?: ChapterAccess
+  loadState: ChapterLoadState
+}
+
+export interface UpdateChapterAccessPayload {
+  chapterAccess: Record<number, ChapterAccess>
+  merge?: boolean
 }
 
 export interface UpdateLinesPayload {
@@ -99,6 +136,7 @@ export type SignalAnnotationFailurePayload = Omit<AnnotationFailureSignal, 'nonc
 export const OUTBOUND_TYPES = {
   bridgeReady: 'bridgeReady',
   epubLoaded: 'epubLoaded',
+  bookLoaded: 'bookLoaded',
   ready: 'ready',
   chapterChange: 'chapterChange',
   prefetch: 'prefetch',
@@ -124,6 +162,12 @@ export const OUTBOUND_TYPES = {
 export type OutboundType = (typeof OUTBOUND_TYPES)[keyof typeof OUTBOUND_TYPES]
 
 export interface EpubLoadedPayload {
+  bookId: number
+  bookMeta: BookMeta
+  chapterList: ChapterMeta[]
+}
+
+export interface BookLoadedPayload {
   bookId: number
   bookMeta: BookMeta
   chapterList: ChapterMeta[]

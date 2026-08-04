@@ -105,6 +105,15 @@ class _EpubReaderWebViewState extends State<EpubReaderWebView> {
 
   void _handleBridgeMessage(BridgeMessage msg) {
     switch (msg.type) {
+      case 'chapterChange':
+        // API 模式：请求后端后 injectChapter
+        // final payload = msg.payload as Map<String, dynamic>;
+        // final chapterId = payload['chapterId'] as int;
+        // final width = payload['width'] as int;
+        // _dispatch('injectChapter', {'chapterId': chapterId, 'loadState': 'loading'});
+        // final result = await fetchChapterContent(bookId, chapterId, width);
+        // _dispatch('injectChapter', {'chapterId': chapterId, 'content': result.content, 'access': result.access, 'loadState': 'ready'});
+        break;
       case 'lineCreate':
         // TODO: 调 API 保存划线
         // 成功: _dispatch('updateLines', {'chapterId': ..., 'lines': [...], 'merge': true})
@@ -123,6 +132,18 @@ class _EpubReaderWebViewState extends State<EpubReaderWebView> {
   }
 
   /// 外部可调用的 bridge 方法
+  void loadBook(Map<String, dynamic> payload) {
+    _dispatch('loadBook', payload);
+  }
+
+  void injectChapter(Map<String, dynamic> payload) {
+    _dispatch('injectChapter', payload);
+  }
+
+  void updateChapterAccess(Map<String, dynamic> chapterAccess, {bool merge = true}) {
+    _dispatch('updateChapterAccess', {'chapterAccess': chapterAccess, 'merge': merge});
+  }
+
   void updateLines(int chapterId, List<Map<String, dynamic>> lines, {bool merge = true}) {
     _dispatch('updateLines', {'chapterId': chapterId, 'lines': lines, 'merge': merge});
   }

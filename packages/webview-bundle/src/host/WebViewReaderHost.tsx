@@ -31,7 +31,9 @@ export function WebViewReaderHost({ state, commandCtx }: WebViewReaderHostProps)
   const onChapterChange = useCallback(
     (chapterId: number, width: number) => {
       emit(OUTBOUND_TYPES.chapterChange, { chapterId, width })
-      void fetchChapterContent(commandCtx, chapterId)
+      if (commandCtx.getState().dataSource === 'epub') {
+        void fetchChapterContent(commandCtx, chapterId)
+      }
     },
     [commandCtx],
   )
@@ -39,7 +41,9 @@ export function WebViewReaderHost({ state, commandCtx }: WebViewReaderHostProps)
   const onPrefetch = useCallback(
     (ids: number[], width: number) => {
       emit(OUTBOUND_TYPES.prefetch, { chapterIds: ids, width })
-      ids.forEach((id) => void fetchChapterContent(commandCtx, id))
+      if (commandCtx.getState().dataSource === 'epub') {
+        ids.forEach((id) => void fetchChapterContent(commandCtx, id))
+      }
     },
     [commandCtx],
   )
@@ -129,9 +133,10 @@ export function WebViewReaderHost({ state, commandCtx }: WebViewReaderHostProps)
   }
 
   if (state.bootstrapError) {
+    const label = state.dataSource === 'epub' ? 'EPUB' : '书籍'
     return (
       <div style={{ padding: 24 }}>
-        <p>EPUB 加载失败：{state.bootstrapError}</p>
+        <p>{label}加载失败：{state.bootstrapError}</p>
       </div>
     )
   }

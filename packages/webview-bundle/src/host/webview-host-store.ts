@@ -23,8 +23,11 @@ export interface AnnotationFailureSignal {
   nonce: number
 }
 
+export type DataSource = 'epub' | 'api' | null
+
 export interface WebViewHostState {
   bookId: number
+  dataSource: DataSource
   loading: boolean
   ready: boolean
   bootstrapError: string | null
@@ -47,6 +50,7 @@ export interface WebViewHostState {
 export function createEmptyHostState(bookId = 0): WebViewHostState {
   return {
     bookId,
+    dataSource: null,
     loading: false,
     ready: false,
     bootstrapError: null,
@@ -196,4 +200,35 @@ export function applyUpdateBookmarks(
     return { ...state, bookmarks: { ...state.bookmarks, [chapterId]: [...byId.values()] } }
   }
   return { ...state, bookmarks: { ...state.bookmarks, [chapterId]: bookmarks } }
+}
+
+export function applyInjectChapter(
+  state: WebViewHostState,
+  chapterId: number,
+  loadState: ChapterLoadState,
+  content?: ChapterContent,
+  access?: ChapterAccess,
+): WebViewHostState {
+  const next: WebViewHostState = {
+    ...state,
+    chapterLoadStates: { ...state.chapterLoadStates, [chapterId]: loadState },
+  }
+  if (content) {
+    next.chapters = { ...state.chapters, [chapterId]: content }
+  }
+  if (access) {
+    next.chapterAccess = { ...state.chapterAccess, [chapterId]: access }
+  }
+  return next
+}
+
+export function applyUpdateChapterAccess(
+  state: WebViewHostState,
+  chapterAccess: Record<number, ChapterAccess>,
+  merge = true,
+): WebViewHostState {
+  if (merge) {
+    return { ...state, chapterAccess: { ...state.chapterAccess, ...chapterAccess } }
+  }
+  return { ...state, chapterAccess }
 }

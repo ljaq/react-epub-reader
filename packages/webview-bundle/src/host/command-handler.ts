@@ -6,17 +6,23 @@ import type { Dispatch, SetStateAction } from 'react'
 import type { BridgeMessage } from '../bridge/protocol'
 import {
   INBOUND_TYPES,
+  OUTBOUND_TYPES,
   type EpubChunkPayload,
+  type InjectChapterPayload,
+  type LoadBookPayload,
   type LoadEpubPayload,
   type NavigateThoughtsPayload,
   type SignalAnnotationFailurePayload,
   type UpdateBookmarksPayload,
+  type UpdateChapterAccessPayload,
   type UpdateLinesPayload,
   type UpdateNotesPayload,
 } from '../bridge/protocol'
 import { emit } from '../bridge/dispatch'
 import {
+  applyInjectChapter,
   applyUpdateBookmarks,
+  applyUpdateChapterAccess,
   applyUpdateLines,
   applyUpdateNotes,
   buildChapterAccess,
@@ -68,6 +74,7 @@ async function bootstrapEpub(
 
   setState(() => ({
     ...createEmptyHostState(payload.bookId),
+    dataSource: 'epub',
     loading: true,
     bootstrapError: null,
   }))
@@ -112,6 +119,7 @@ async function bootstrapEpub(
 
     setState({
       bookId: payload.bookId,
+      dataSource: 'epub',
       loading: false,
       ready: true,
       bootstrapError: null,
@@ -137,7 +145,7 @@ async function bootstrapEpub(
       annotationFailure: null,
     })
 
-    emit('epubLoaded', {
+    emit(OUTBOUND_TYPES.epubLoaded, {
       bookId: payload.bookId,
       bookMeta: {
         bookId: payload.bookId,
@@ -160,6 +168,72 @@ async function bootstrapEpub(
     }))
     emit('error', { scope: 'loadEpub', message })
   }
+}
+
+function handleLoadBook(ctx: CommandContext, payload: LoadBookPayload): void {
+  const { setState, adapterRef } = ctx
+
+  adapterRef.current?.destroy?.()
+  adapterRef.current = null
+
+  const initialChapterId =
+    payload.initialChapterId ?? payload.chapterList[0]?.id
+
+  if (initialChapterId != null) {
+    const loadState = payload.chapterLoadStates[initialChapterId]
+    const hasContent = Boolean(payload.chapters[initialChapterId]?.html)
+    if (loadState !== 'ready' || !hasContent) {
+      const message = `首章 ${initialChapterId} 未就绪（需 chapterLoadStates=ready 且含 HTML）`
+      setState({
+        ...createEmptyHostState(payload.bookId),
+        dataSource: 'api',
+        bootstrapError: message,
+      })
+      emit('error', { scope: 'loadBook', message })
+      return
+    }
+  }
+
+  setState({
+    bookId: payload.bookId,
+    dataSource: 'api',
+    loading: false,
+    ready: true,
+    bootstrapError: null,
+    chapterList: payload.chapterList,
+    chapters: payload.chapters,
+    chapterAccess: payload.chapterAccess,
+    chapterLoadStates: payload.chapterLoadStates,
+    lines: payload.lines ?? {},
+    notes: payload.notes ?? {},
+    bookmarks: payload.bookmarks ?? {},
+    bookMeta: payload.bookMeta,
+    user: payload.user ?? { isLoggedIn: true, inBookshelf: false },
+    ttsVoiceTypes: payload.ttsVoiceTypes ?? DEFAULT_TTS_VOICES,
+    ttsAudioUrl: null,
+    initialChapterId,
+    initialPosition: payload.initialPosition,
+    annotationFailure: null,
+  })
+
+  emit(OUTBOUND_TYPES.bookLoaded, {
+    bookId: payload.bookId,
+    bookMeta: payload.bookMeta,
+    chapterList: payload.chapterList,
+  })
+}
+
+function handleInjectChapter(ctx: CommandContext, payload: InjectChapterPayload): void {
+  const { chapterId, content, access, loadState } = payload
+  ctx.setState((s) => applyInjectChapter(s, chapterId, loadState, content, access))
+}
+
+function handleUpdateChapterAccess(
+  ctx: CommandContext,
+  payload: UpdateChapterAccessPayload,
+): void {
+  const merge = payload.merge ?? true
+  ctx.setState((s) => applyUpdateChapterAccess(s, payload.chapterAccess, merge))
 }
 
 async function handleLoadEpub(ctx: CommandContext, payload: LoadEpubPayload): Promise<void> {
@@ -254,6 +328,15 @@ export async function handleBridgeCommand(
     case INBOUND_TYPES.epubChunk:
       await handleEpubChunk(ctx, msg.payload as EpubChunkPayload)
       break
+    case INBOUND_TYPES.loadBook:
+      handleLoadBook(ctx, msg.payload as LoadBookPayload)
+      break
+    case INBOUND_TYPES.injectChapter:
+      handleInjectChapter(ctx, msg.payload as InjectChapterPayload)
+      break
+    case INBOUND_TYPES.updateChapterAccess:
+      handleUpdateChapterAccess(ctx, msg.payload as UpdateChapterAccessPayload)
+      break
     case INBOUND_TYPES.updateLines:
       handleUpdateLines(ctx, msg.payload as UpdateLinesPayload)
       break
@@ -290,6 +373,8 @@ export async function fetchChapterContent(
   ctx: CommandContext,
   chapterId: number,
 ): Promise<void> {
+  if (ctx.getState().dataSource !== 'epub') return
+
   const adapter = ctx.adapterRef.current
   if (!adapter) return
 

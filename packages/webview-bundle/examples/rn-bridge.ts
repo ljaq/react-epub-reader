@@ -69,6 +69,20 @@ export function createRnBridge(webViewRef: RefObject<WebView | null>) {
         source: { kind: 'url', data: epubUrl },
       } satisfies LoadEpubPayload)
     },
+    loadBook(payload: Record<string, unknown>) {
+      this.dispatch('loadBook', payload)
+    },
+    injectChapter(payload: {
+      chapterId: number
+      content?: unknown
+      access?: unknown
+      loadState: 'idle' | 'loading' | 'ready' | 'error'
+    }) {
+      this.dispatch('injectChapter', payload)
+    },
+    updateChapterAccess(chapterAccess: Record<string, unknown>, merge = true) {
+      this.dispatch('updateChapterAccess', { chapterAccess, merge })
+    },
     updateLines(chapterId: number, lines: unknown[], merge = true) {
       this.dispatch('updateLines', { chapterId, lines, merge })
     },
@@ -117,5 +131,22 @@ export function createRnBridge(webViewRef: RefObject<WebView | null>) {
  *   }}
  *   onLoadEnd={() => bridge.loadEpub(epubFileUrl)}
  * />
+ * ```
+ *
+ * API 模式伪代码：
+ *
+ * ```tsx
+ * // bootstrap
+ * const [meta, chapterList, lines, notes, bookmarks, position] = await Promise.all([...])
+ * const { content, access } = await fetchChapterContent(bookId, initialChapterId, 398)
+ * bridge.loadBook({ bookId, bookMeta: meta, chapterList, chapterAccess, chapters: { [id]: content }, ... })
+ *
+ * // onMessage
+ * if (msg?.type === 'chapterChange') {
+ *   const { chapterId, width } = msg.payload
+ *   bridge.injectChapter({ chapterId, loadState: 'loading' })
+ *   const { content, access } = await fetchChapterContent(bookId, chapterId, width)
+ *   bridge.injectChapter({ chapterId, content, access, loadState: 'ready' })
+ * }
  * ```
  */

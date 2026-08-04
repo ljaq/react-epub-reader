@@ -261,12 +261,24 @@ sequenceDiagram
 | type | 用途 |
 |---|---|
 | `loadEpub` | 加载 EPUB（`source.kind`: `url` 或 `base64`） |
+| `loadBook` | API 模式 bootstrap（App 请求后端后注入全书元数据 + 首章 HTML） |
+| `injectChapter` | API 模式按需注入单章（响应 `chapterChange` / `prefetch`） |
+| `updateChapterAccess` | 批量更新章节权限（付费解锁后） |
 | `epubChunk` | 大文件分片传输 |
 | `updateLines` / `updateNotes` / `updateBookmarks` | 注入或更新标注 |
 | `injectTtsAudio` | TTS 音频回注（响应 `ttsAudioRequest` 事件） |
 | `signalAnnotationFailure` | 标注保存失败，触发 DOM rollback |
 | `updateUser` | 更新登录 / 书架态 |
 | `destroy` | 卸载当前书籍 |
+
+### 数据源模式
+
+| 模式 | 入口 | 章节来源 | 切章 |
+|------|------|---------|------|
+| EPUB | `loadEpub` | WebView 内 epub-adapter 解析 | WebView 自行取章 |
+| API | `loadBook` | App 请求后端后注入 | WebView 发 `chapterChange`，App 回注 `injectChapter` |
+
+API 模式对齐 [`ReaderHost`](apps/h5-demo/src/host/ReaderHost.tsx)：所有 fetch 在 App 层完成，WebView 零网络请求。Bootstrap 时 App 并行拉取 bookMeta/chapterList/标注/进度，再请求首章 HTML 后 `loadBook`；切章时监听 `chapterChange` 事件，请求后端后 `injectChapter`。
 
 WebView 会将 Reader 全部回调映射为事件上报 App，包括 `lineCreate`、`readingPositionChange`、`ttsAudioRequest`、`navigate`（随感等）等。
 

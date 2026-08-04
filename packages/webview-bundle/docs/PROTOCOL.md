@@ -84,6 +84,69 @@ WebView 自动探测平台并发送 JSON 字符串：
 }
 ```
 
+### `loadBook`（API 数据源模式）
+
+App 请求后端后，将书籍元数据、章列表、首章 HTML、标注等一次性注入。WebView **不发起网络请求**。
+
+```json
+{
+  "v": 1,
+  "type": "loadBook",
+  "payload": {
+    "bookId": 12535542,
+    "bookMeta": { "bookId": 12535542, "bookName": "示例书", "author": "作者", "bookPic": "" },
+    "chapterList": [{ "id": 1, "chapterName": "第一章", "wordCount": 1000, "tag": "免费", "isOrder": true, "anchorId": "1", "index": 0 }],
+    "chapterAccess": { "1": { "chapterId": 1, "canRead": true, "needLogin": false, "needPurchase": false, "isLoggedIn": true } },
+    "chapters": { "1": { "chapterId": 1, "chapterName": "第一章", "html": "<p>正文</p>", "hasNext": true, "pageButton": "" } },
+    "chapterLoadStates": { "1": "ready" },
+    "lines": {},
+    "notes": {},
+    "bookmarks": {},
+    "user": { "isLoggedIn": true, "inBookshelf": false },
+    "initialChapterId": 1,
+    "initialPosition": { "chapterId": 1, "domPos": "0=1=0=0#0", "precent": 0 }
+  }
+}
+```
+
+要求：`initialChapterId` 对应章的 `chapterLoadStates[id] === 'ready'` 且 `chapters[id].html` 非空。
+
+成功后 WebView 发出 `bookLoaded` 事件。
+
+### `injectChapter`（API 模式按需切章）
+
+响应 `chapterChange` / `prefetch` 事件，App 请求后端后注入单章：
+
+```json
+{
+  "v": 1,
+  "type": "injectChapter",
+  "payload": {
+    "chapterId": 2,
+    "content": { "chapterId": 2, "chapterName": "第二章", "html": "<p>正文</p>", "hasNext": true, "pageButton": "" },
+    "access": { "chapterId": 2, "canRead": true, "needLogin": false, "needPurchase": false, "isLoggedIn": true },
+    "loadState": "ready"
+  }
+}
+```
+
+加载中可先发 `loadState: "loading"`；失败发 `loadState: "error"`（`content` 可省略）。
+
+### `updateChapterAccess`
+
+付费解锁后批量更新章节权限：
+
+```json
+{
+  "v": 1,
+  "type": "updateChapterAccess",
+  "payload": {
+    "merge": true,
+    "chapterAccess": { "3": { "chapterId": 3, "canRead": true, "needLogin": false, "needPurchase": false, "isLoggedIn": true } }
+  }
+}
+```
+
 ### `updateLines`
 
 更新划线（默认增量合并）。
@@ -207,6 +270,7 @@ TTS 音频回注（响应 `ttsAudioRequest` 事件）。
 |------|---------|---------|
 | `bridgeReady` | WebView bridge 初始化完成 | `{ version: 1 }` |
 | `epubLoaded` | EPUB 解析完成 | `{ bookId, bookMeta, chapterList }` |
+| `bookLoaded` | API 模式 bootstrap 完成 | `{ bookId, bookMeta, chapterList }` |
 | `ready` | Reader 初始化完成 | `{ bookId }` |
 | `chapterChange` | 换章 | `{ chapterId, width }` |
 | `prefetch` | 预取相邻章 | `{ chapterIds, width }` |
@@ -227,6 +291,33 @@ TTS 音频回注（响应 `ttsAudioRequest` 事件）。
 2. App 调 API 保存
 3. 成功 → App 发 `updateLines`（对应项带 `clientId`）
 4. 失败 → App 发 `signalAnnotationFailure` → WebView rollback
+
+## 数据源模式对比
+
+| 模式 | 入口命令 | 章节来源 | 切章时 |
+|------|---------|---------|--------|
+| EPUB | `loadEpub` | epub-adapter 内部解析 | WebView 自行取章 |
+| API | `loadBook` | App 注入 | 发 `chapterChange`/`prefetch`，App 回注 `injectChapter` |
+
+### API 模式 Bootstrap 时序
+
+```
+1. App 并行请求后端：bookMeta / chapterList / lines / notes / bookmarks / readPosition / checkread
+2. App 请求首章 HTML：fetchChapterContent(bookId, initialChapterId, 398)
+3. App dispatch('loadBook', payload)
+4. WebView 发 bookLoaded → 进入阅读态
+5. 可选：预取相邻章，提前 injectChapter
+```
+
+### API 模式切章时序
+
+```
+1. 用户翻页 → WebView 发 chapterChange { chapterId, width }
+2. App 若未缓存该章：
+   a. dispatch injectChapter({ chapterId, loadState: 'loading' })  // 可选
+   b. 请求后端 fetchChapterContent
+   c. dispatch injectChapter({ chapterId, content, access, loadState: 'ready' })
+```
 
 ## 构建与集成
 
