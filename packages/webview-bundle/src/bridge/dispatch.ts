@@ -4,9 +4,16 @@ import { sendToNative } from './transport'
 export type CommandHandler = (msg: BridgeMessage) => void | Promise<void>
 
 let commandHandler: CommandHandler | null = null
+const pendingQueue: string[] = []
 
 export function setCommandHandler(handler: CommandHandler | null): void {
   commandHandler = handler
+  if (!handler) return
+
+  const queue = pendingQueue.splice(0)
+  for (const raw of queue) {
+    void handleDispatch(raw)
+  }
 }
 
 export function emit<T>(type: string, payload?: T, id?: string): void {
@@ -21,7 +28,7 @@ async function handleDispatch(raw: string): Promise<void> {
   }
 
   if (!commandHandler) {
-    emit('error', { scope: 'bridge', message: 'Bridge not ready' })
+    pendingQueue.push(raw)
     return
   }
 
@@ -53,6 +60,5 @@ export function installBridge(): void {
       void handleDispatch(raw)
     },
   }
-
-  emit('bridgeReady', { version: 1 })
+  // bridgeReady 在 WebViewReaderApp 注册 commandHandler 后再发出
 }

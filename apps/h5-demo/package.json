@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "pnpm --filter @react-epub-reader/webview-bundle build && node ./scripts/copy-webview.mjs && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@react-epub-reader/epub-adapter": "workspace:*",
     "@react-epub-reader/reader": "workspace:*",
+    "@react-epub-reader/webview-bundle": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2"

@@ -71,11 +71,35 @@ pnpm install
 pnpm dev
 ```
 
-浏览器打开后默认进入示例书阅读页：
+浏览器打开后默认进入示例书阅读页（**H5 组件模式**）：
 
 **http://localhost:5173/book/12535542/read**
 
-### 路由
+### 三种演示模式（DevPanel 切换）
+
+| 模式 | 说明 |
+|---|---|
+| **H5 组件** | 直挂 `<Reader />` + `ReaderHost` + React Router（随感等业务路由） |
+| **WebView 模拟 · API** | `<iframe src="/webview/">` 加载 webview-bundle，父页 Mock Native 通过 bridge 发 `loadBook` / `injectChapter` |
+| **WebView 模拟 · EPUB** | 同上 iframe，通过 `loadEpub` 加载 `sample.epub` 或本地文件 |
+
+WebView 模式在 DevTools 中可见 `data-webview-iframe="true"` 的 iframe；父页通过 `window.EpubReaderBridge` 与 iframe 内 `parent.EpubReaderBridge.postMessage` 通信。
+
+`pnpm dev` 会**同时启动** h5-demo（:5173）与 webview-bundle（:5174），前者将 `/webview` 代理到后者以保持同源。仅调试 webview-bundle 时可单独 `pnpm dev:webview`。
+
+### 标注本地持久化
+
+划线 / 批注 / 书签写入 `localStorage`（key：`h5-demo-annotations:v1:{scope}`），刷新后可回显：
+
+| scope | 适用场景 |
+|---|---|
+| `book:12535542` | H5 组件、WebView API 模式 |
+| `epub:sample` | WebView EPUB · sample.epub |
+| `epub:file:{文件名}` | WebView EPUB · 本地文件 |
+
+实现见 [`apps/h5-demo/src/storage/annotation-storage.ts`](apps/h5-demo/src/storage/annotation-storage.ts)。
+
+### 路由（H5 组件模式）
 
 | 路径 | 说明 |
 |---|---|
@@ -83,19 +107,18 @@ pnpm dev
 | `/book/:id/read` | Mock API 阅读页（`ReaderHost` 桥接） |
 | `/book/:id/thoughts` | 随感列表 |
 | `/book/:id/thoughts/write` | 写随感 |
-| `/dev/epub` | EPUB 调试页（独立路由） |
 
 ### DevPanel（仅开发环境）
 
-右上角 DevPanel 可切换：
+右上角 DevPanel 可切换演示模式，并提供：
 
 | 选项 | 说明 |
 |---|---|
-| Mock API（路由） | 默认；走内存 Mock + 完整 API 链路 |
-| EPUB（sample.epub） | 使用 `public/sample.epub`，不经过 Mock API |
-| EPUB（本地文件） | 选择本地 `.epub` 文件 |
-| USE_MOCK | 展示态；实际需 `VITE_USE_MOCK=false` 并**刷新**后走真实 HTTP |
-| 划线/批注/书签失败 | 模拟下次 API 失败，验证 rollback |
+| H5 组件（直挂 Reader） | 默认；走 Mock API + 完整宿主链路 |
+| WebView 模拟 · API 模式 | bridge `loadBook` + 按需 `injectChapter` |
+| WebView 模拟 · EPUB 模式 | bridge `loadEpub`；可选 sample / 本地文件 |
+| USE_MOCK | 仅 H5 模式；实际需 `VITE_USE_MOCK=false` 并**刷新**后走真实 HTTP |
+| 划线/批注/书签失败 | 模拟下次保存失败，验证 rollback |
 
 Mock 示例书 **第二章** 含富媒体（图片 / 脚注 / 外链），适合 smoke 测试。
 
@@ -107,7 +130,7 @@ Mock 示例书 **第二章** 含富媒体（图片 / 脚注 / 外链），适合
 pnpm dev:webview
 ```
 
-浏览器打开 **http://localhost:5174**，在控制台手动注入 EPUB：
+浏览器打开 **http://localhost:5174/webview/**，在控制台手动注入 EPUB：
 
 ```javascript
 window.__EpubReader.dispatch(JSON.stringify({
@@ -211,7 +234,7 @@ const content = await adapter.getChapterContent(chapterId)
 // 将 content 填入 ReaderProps.chapters[chapterId]
 ```
 
-参考 [`apps/h5-demo/src/epub-host.tsx`](apps/h5-demo/src/epub-host.tsx)。
+WebView EPUB 模式参考 [`apps/h5-demo/src/modes/webview/`](apps/h5-demo/src/modes/webview/)。
 
 ---
 

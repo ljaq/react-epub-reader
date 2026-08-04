@@ -1,5 +1,6 @@
 /**
  * Mock 内存 store — 写操作后 list 可读，字段对齐接口案例.md。
+ * 标注数据同步持久化到 localStorage（annotation-storage）。
  */
 import type {
   BookmarkItem,
@@ -11,6 +12,12 @@ import type {
   ReadingSnapshot,
   TtsVoiceType
 } from '@react-epub-reader/reader'
+import {
+  loadAnnotations,
+  resolveScope,
+  saveAnnotations,
+  type PersistedAnnotations,
+} from '../storage/annotation-storage'
 
 const para = (text: string): string => `<p>${text}</p>`
 
@@ -76,6 +83,25 @@ export interface MockStoreState {
 
 const stores = new Map<number, MockStoreState>()
 
+function annotationScope(bookId: number) {
+  return resolveScope({ mode: 'h5-component', bookId })
+}
+
+function persistAnnotations(bookId: number, store: MockStoreState): void {
+  const scope = annotationScope(bookId)
+  saveAnnotations(scope, {
+    lines: store.lines,
+    notes: store.notes,
+    bookmarks: store.bookmarks,
+    nextLineId: store.nextLineId,
+    nextNoteId: store.nextNoteId,
+  })
+}
+
+function hydrateAnnotations(bookId: number): PersistedAnnotations {
+  return loadAnnotations(annotationScope(bookId))
+}
+
 function buildChapterList(): ChapterMeta[] {
   return [
     { id: 1, chapterName: '第一章 引子', wordCount: 1200, tag: '免费', isOrder: true, anchorId: 'ch1', index: 0 },
@@ -89,6 +115,8 @@ export function getOrCreateMockStore(bookId: number): MockStoreState {
   let store = stores.get(bookId)
   if (store) return store
 
+  const persisted = hydrateAnnotations(bookId)
+
   store = {
     bookId,
     bookMeta: {
@@ -101,9 +129,9 @@ export function getOrCreateMockStore(bookId: number): MockStoreState {
     },
     chapterList: buildChapterList(),
     chapters: {},
-    lines: {},
-    notes: {},
-    bookmarks: {},
+    lines: persisted.lines,
+    notes: persisted.notes,
+    bookmarks: persisted.bookmarks,
     readingPosition: {
       chapterId: 2,
       domPos: '0=1=0=0#0',
@@ -139,9 +167,9 @@ export function getOrCreateMockStore(bookId: number): MockStoreState {
         avatar: ''
       }
     ],
-    nextLineId: 1000,
-    nextNoteId: 2000,
-    nextThoughtId: 100
+    nextLineId: persisted.nextLineId,
+    nextNoteId: persisted.nextNoteId,
+    nextThoughtId: 100,
   }
   stores.set(bookId, store)
   return store
@@ -194,6 +222,7 @@ export function mockSaveLine(bookId: number, payload: LineItem): LineItem {
   const cid = payload.chapterId
   if (!store.lines[cid]) store.lines[cid] = {}
   store.lines[cid][payload.webLineId] = item
+  persistAnnotations(bookId, store)
   return item
 }
 
@@ -204,6 +233,7 @@ export function mockEditLine(bookId: number, payload: LineItem): LineItem {
   const item: LineItem = { ...existing, ...payload, time: existing?.time || '刚刚' }
   if (!store.lines[cid]) store.lines[cid] = {}
   store.lines[cid][payload.webLineId] = item
+  persistAnnotations(bookId, store)
   return item
 }
 
@@ -219,6 +249,7 @@ export function mockDeleteLine(bookId: number, webLineId: string): void {
       delete store.lines[cid][webLineId]
     }
   })
+  persistAnnotations(bookId, store)
 }
 
 export function mockSaveNote(bookId: number, payload: NoteItem): NoteItem {
@@ -228,6 +259,7 @@ export function mockSaveNote(bookId: number, payload: NoteItem): NoteItem {
   const cid = payload.chapterId
   if (!store.notes[cid]) store.notes[cid] = {}
   store.notes[cid][payload.webNoteId] = item
+  persistAnnotations(bookId, store)
   return item
 }
 
@@ -243,6 +275,7 @@ export function mockDeleteNote(bookId: number, webNoteId: string): void {
       delete store.notes[cid][webNoteId]
     }
   })
+  persistAnnotations(bookId, store)
 }
 
 export function mockFetchBookmarks(bookId: number): Record<number, BookmarkItem[]> {
@@ -258,12 +291,14 @@ export function mockSaveBookmark(bookId: number, payload: BookmarkItem): Bookmar
   if (idx >= 0) list[idx] = item
   else list.push(item)
   store.bookmarks[cid] = list
+  persistAnnotations(bookId, store)
   return item
 }
 
 export function mockDeleteBookmark(bookId: number, chapterId: number, id: string): void {
   const store = getOrCreateMockStore(bookId)
   store.bookmarks[chapterId] = (store.bookmarks[chapterId] || []).filter((b) => b.id !== id)
+  persistAnnotations(bookId, store)
 }
 
 export function mockSaveReadPosition(bookId: number, snapshot: ReadingSnapshot): void {

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { EpubAdapter } from '@react-epub-reader/epub-adapter'
-import { setCommandHandler } from './bridge/dispatch'
+import { emit, setCommandHandler } from './bridge/dispatch'
 import { handleBridgeCommand, type CommandContext } from './host/command-handler'
 import { WebViewReaderHost } from './host/WebViewReaderHost'
 import { createEmptyHostState, type WebViewHostState } from './host/webview-host-store'
+import { OUTBOUND_TYPES } from './bridge/protocol'
 
 export function WebViewReaderApp() {
   const [state, setState] = useState<WebViewHostState>(() => createEmptyHostState())
@@ -20,9 +21,10 @@ export function WebViewReaderApp() {
     epubChunkBuffer,
   })
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const ctx = commandCtxRef.current
     setCommandHandler((msg) => handleBridgeCommand(msg, ctx))
+    emit(OUTBOUND_TYPES.bridgeReady, { version: 1 })
     return () => {
       setCommandHandler(null)
       adapterRef.current?.destroy?.()
@@ -31,7 +33,7 @@ export function WebViewReaderApp() {
   }, [])
 
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
       <WebViewReaderHost state={state} commandCtx={commandCtxRef.current} />
     </div>
   )

@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @react-epub-reader/h5-demo dev",
+    "dev": "concurrently -k -n webview,h5 -c blue,green \"pnpm dev:webview\" \"pnpm --filter @react-epub-reader/h5-demo dev\"",
+    "dev:h5": "pnpm --filter @react-epub-reader/h5-demo dev",
     "dev:webview": "pnpm --filter @react-epub-reader/webview-bundle dev",
     "build": "pnpm -r run build",
     "test": "vitest run --passWithNoTests",
@@ -20,11 +21,13 @@
     }
   },
   "devDependencies": {
+    "@rolldown/binding-darwin-arm64": "1.2.1",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "commitizen": "^4.3.2",
+    "concurrently": "^9.2.1",
     "cz-git": "^1.13.1",
     "jsdom": "^25.0.1",
     "oxlint": "^1.75.0",

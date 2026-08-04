@@ -22,6 +22,17 @@ export function sendToNative(raw: string): void {
     return
   }
 
+  // h5-demo iframe 模拟：WebView 在子 frame，Native 在 parent
+  try {
+    const parent = w.parent
+    if (parent && parent !== w && parent.EpubReaderBridge?.postMessage) {
+      parent.EpubReaderBridge.postMessage(raw)
+      return
+    }
+  } catch {
+    // cross-origin parent access blocked
+  }
+
   // 浏览器调试 fallback
   // eslint-disable-next-line no-console
   console.debug('[EpubReader] → native (no bridge)', raw)

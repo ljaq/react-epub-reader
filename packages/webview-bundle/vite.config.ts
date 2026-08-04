@@ -16,9 +16,10 @@ function copyDocsToDist(): import('vite').Plugin {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react(), copyDocsToDist()],
-  base: './',
+  // dev：经 h5-demo /webview 代理时资源路径需带前缀；build：相对路径供 App / public/webview 嵌入
+  base: command === 'serve' ? '/webview/' : './',
   build: {
     target: 'es2020',
     outDir: 'dist',
@@ -45,4 +46,4 @@ export default defineConfig({
       'Access-Control-Allow-Origin': '*',
     },
   },
-})
+}))

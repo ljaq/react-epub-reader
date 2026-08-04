@@ -18,5 +18,13 @@ export default defineConfig({
       // 允许 EPUB 本地文件模式跨域读取
       'Access-Control-Allow-Origin': '*',
     },
+    proxy: {
+      // WebView iframe 模拟：代理到 webview-bundle dev server（base=/webview/，勿 rewrite）
+      '/webview': {
+        target: 'http://127.0.0.1:5174',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
 })
