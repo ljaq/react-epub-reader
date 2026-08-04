@@ -228,10 +228,15 @@ pnpm --filter @react-epub-reader/webview-bundle build
 ```
 packages/webview-bundle/dist/
 ├── index.html
-└── assets/
-    ├── index-*.js    # 含 reader + epub-adapter + bridge
-    └── index-*.css   # reader 样式
+├── assets/
+│   ├── index.js    # 含 reader + epub-adapter + bridge
+│   └── index.css   # reader 样式
+└── docs/
+    ├── PROTOCOL.md   # Bridge 协议（随包分发，便于 AI 接入）
+    └── examples/   # RN / Flutter 参考代码
 ```
+
+> **AI 接入**：App 工程内 `@dist/docs/PROTOCOL.md` 或 `@dist/docs` 即可带入协议与示例，无需额外说明。
 
 将 `dist/` 打入 App assets（RN：`file:///android_asset/webview/index.html`；Flutter：`assets/webview/index.html`）。
 
@@ -284,7 +289,7 @@ WebView 会将 Reader 全部回调映射为事件上报 App，包括 `lineCreate
 
 ### 集成示例
 
-**React Native**（[`examples/rn-bridge.ts`](packages/webview-bundle/examples/rn-bridge.ts)）：
+**React Native**（[`docs/examples/rn-bridge.ts`](packages/webview-bundle/docs/examples/rn-bridge.ts)）：
 
 ```tsx
 import { createRnBridge, parseBridgeMessage } from './rn-bridge'
@@ -303,7 +308,7 @@ const bridge = createRnBridge(ref)
 />
 ```
 
-**Flutter**（[`examples/flutter_bridge.dart`](packages/webview-bundle/examples/flutter_bridge.dart)）：
+**Flutter**（[`docs/examples/flutter_bridge.dart`](packages/webview-bundle/docs/examples/flutter_bridge.dart)）：
 
 ```dart
 controller.addJavaScriptChannel('EpubReaderBridge',

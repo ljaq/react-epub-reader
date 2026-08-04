@@ -1,8 +1,23 @@
+import { cpSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const rootDir = fileURLToPath(new URL('.', import.meta.url))
+
+/** 构建后将 docs/ 复制到 dist/docs（含 PROTOCOL.md、examples/），便于 App / AI 随包读取 */
+function copyDocsToDist(): import('vite').Plugin {
+  return {
+    name: 'copy-docs-to-dist',
+    closeBundle() {
+      cpSync(resolve(rootDir, 'docs'), resolve(rootDir, 'dist/docs'), { recursive: true })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), copyDocsToDist()],
   base: './',
   build: {
     target: 'es2020',

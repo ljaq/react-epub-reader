@@ -326,6 +326,19 @@ pnpm --filter @react-epub-reader/webview-bundle build
 # 产物：packages/webview-bundle/dist/
 ```
 
+```
+dist/
+├── index.html
+├── assets/
+│   ├── index.js
+│   └── index.css
+└── docs/
+    ├── PROTOCOL.md       # Bridge 协议
+    └── examples/         # RN / Flutter 参考代码
+        ├── rn-bridge.ts
+        └── flutter_bridge.dart
+```
+
 将 `dist/` 目录打入 App assets：
 
 - **RN Android**: `file:///android_asset/webview/index.html`
@@ -348,5 +361,7 @@ window.__EpubReader.dispatch(JSON.stringify({
 ```
 
 参考示例代码：
-- [`examples/rn-bridge.ts`](../examples/rn-bridge.ts) — RN 侧 bridge 工具函数
-- [`examples/flutter_bridge.dart`](../examples/flutter_bridge.dart) — Flutter 侧参考 widget
+- [`examples/rn-bridge.ts`](./examples/rn-bridge.ts) — RN 侧 bridge 工具函数
+- [`examples/flutter_bridge.dart`](./examples/flutter_bridge.dart) — Flutter 侧参考 widget
+
+> **AI 接入**：将 `dist/` 拷入 App 工程后，对话中 `@dist/docs/PROTOCOL.md` 或 `@dist/docs` 即可带入协议与示例。
