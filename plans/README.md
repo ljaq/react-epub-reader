@@ -17,6 +17,8 @@
 | `phase-07-EpubAdapter.md` | Phase 7（子 Agent G）：epub-adapter 包 | 子 Agent G |
 | `phase-08-H5宿主API.md` | Phase 8（子 Agent H）：API 迁移 + ReaderHost 桥接 | 子 Agent H |
 | `phase-09-收尾验收.md` | Phase 9（子 Agent I）：富媒体 / 书CSS / 随感示例 / 视觉验收 | 子 Agent I |
+| `phase-10-真分页与覆盖翻页.md` | Phase 10（总架构师）：掌阅级覆盖模式 / PageSurface / 克隆页 / 跨章转正 | 总架构师 |
+| `phase-11-性能与物理翻页.md` | Phase 11（总架构师）：拖拽旁路 React / 弹簧翻页 / fling / HTML LRU 缓存 / 长按选区修复 | 总架构师 |
 
 ## 工作流（总架构师 ↔ 子 Agent）
 

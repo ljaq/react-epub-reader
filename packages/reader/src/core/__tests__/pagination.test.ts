@@ -10,6 +10,7 @@ import {
   normalizeScrollWidth,
   PAGE_COLUMN_GAP,
   resolveDragTurn,
+  resolveDragTurnWithFling,
   resolveGlobalDragTurn
 } from '../pagination'
 
@@ -79,6 +80,23 @@ describe('pagination', () => {
     expect(resolveGlobalDragTurn(2, 5, 10, 40)).toBe('stay')
     expect(resolveGlobalDragTurn(4, 5, -50, 40)).toBe('stay')
     expect(resolveGlobalDragTurn(0, 5, 50, 40)).toBe('stay')
+  })
+
+  it('resolveDragTurnWithFling：位置阈值优先，未过阈值时 fling 补判', () => {
+    // 过位置阈值：与 resolveGlobalDragTurn 一致（速度不影响）
+    expect(resolveDragTurnWithFling(2, 5, -50, 0, 40)).toBe('next-page')
+    expect(resolveDragTurnWithFling(2, 5, 50, 0.5, 40)).toBe('prev-page')
+    // 未过阈值 + 达标甩动：按速度方向翻页
+    expect(resolveDragTurnWithFling(2, 5, -10, -0.5, 40)).toBe('next-page')
+    expect(resolveDragTurnWithFling(2, 5, 10, 0.5, 40)).toBe('prev-page')
+    // 未过阈值 + 低速：stay
+    expect(resolveDragTurnWithFling(2, 5, -10, -0.29, 40)).toBe('stay')
+    // 速度方向与位移方向相反（回甩）：stay
+    expect(resolveDragTurnWithFling(2, 5, -10, 0.5, 40)).toBe('stay')
+    expect(resolveDragTurnWithFling(2, 5, 10, -0.5, 40)).toBe('stay')
+    // 边界钳制：末页向前甩/首页向后甩不翻页
+    expect(resolveDragTurnWithFling(4, 5, -10, -0.8, 40)).toBe('stay')
+    expect(resolveDragTurnWithFling(0, 5, 10, 0.8, 40)).toBe('stay')
   })
 
   it('resolveDragTurn 转发', () => {

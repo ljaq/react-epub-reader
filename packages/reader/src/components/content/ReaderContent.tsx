@@ -214,8 +214,13 @@ export function ReaderContent(props: ReaderContentProps): React.ReactNode {
   }, [horizontalEnabled, updateReadingSnapshot, syncTrialEndTip])
 
   useEffect(() => {
-    selectionBridgeRef.current?.applyMarks()
-  }, [chapterId, horizontalEnabled, lines, notes])
+    // 页内翻页后 SegmentView/ChapterFlow 的 dangerouslySetInnerHTML
+    // 可能重置 innerHTML 销毁已注入的 <mark> 元素；补 pageIndex 依赖确保
+    // 每次翻页都补刷 marks（wrapLineMark 内置幂等，不会产生重复包裹）。
+    requestAnimationFrame(() => {
+      selectionBridgeRef.current?.applyMarks()
+    })
+  }, [chapterId, pageIndex, horizontalEnabled, lines, notes])
 
   useEffect(() => {
     syncTrialEndTip()

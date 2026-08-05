@@ -14,6 +14,8 @@
 | 7 Epub Adapter | G | ✅ done | epub-adapter 完整实现 + 13 tests / sample.epub / h5-demo 三模式 / Kindle #fragment 修复 / reader 跨 Phase parity（goChapter/silentExpand/rebalance）已裁定 |
 | 8 H5 宿主 API | H | ✅ done | api/* + ReaderHost + 路由 /book/:id/read / thoughts 占位 / dev/epub / USE_MOCK 默认 true / clientId reconcile + annotationFailure rollback 闭环 / TTS ttsAudioUrl 闭环 / getFetchWidth 接线 / reader 零 fetch |
 | 9 收尾验收 | I | ✅ done | 富媒体 overlays / book-css 接入 / 随感 h5-demo 1:1 / 插槽文档 / README / 162 tests / 视觉以 Vue SCSS+smoke 替代 PNG |
+| 10 真分页与覆盖翻页 | 总架构师 | ✅ done | 掌阅级覆盖模式 / PageSurface 抽象 / 克隆页 / 两阶段跨章转正 / flipMode 四档迁移 / 动画期缓冲锁 |
+| 11 性能与物理翻页 | 总架构师 | ✅ done | 拖拽热路径旁路 React（命令式 transform + rAF 合帧）/ 弹簧积分器 + fling / LRU HTML 缓存 + 布尔选择器 / 207 tests / 满帧 60fps / 覆盖模式长按选区修复 |
 
 ## 契约裁定记录
 
@@ -77,4 +79,9 @@
 
 ## 迁移终态
 
-**Phase 0–9 全部 done。** Vue 阅读器 → React monorepo 1:1 复刻主链路闭环。Post-migration backlog：EPUB 标注 CFI、BookMeta.cssLists typed、Playwright 视觉回归、epub-host 懒加载、reader code-split。
+**Phase 0–11 全部 done。** Vue 阅读器 → React monorepo 1:1 复刻主链路闭环，性能/手感达第一梯队。
+
+Post-migration backlog：
+- EPUB 标注 CFI、BookMeta.cssLists typed、Playwright 视觉回归、epub-host 懒加载、reader code-split
+- 跨章提交瞬间卡顿（~60–230ms）：页容器池化复用/WW 预解析/克隆时机后移等（详见 Phase 11 plan）
+- 仿真翻页（page-flip）：PageSurface 抽象已铺路，待实现

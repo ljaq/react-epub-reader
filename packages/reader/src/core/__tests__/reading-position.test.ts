@@ -151,6 +151,22 @@ describe('chapter-nav', () => {
       '<div class="h5_mainbody_block">y</div>'
     )
   })
+
+  it('wrapChapterHtmlWithNav LRU 缓存：重复调用与缓存淘汰下结果均正确（phase-11）', () => {
+    // 同输入（即使 chapterList/chapterId 不同）走缓存，结果一致
+    const raw = '<p>cache-key</p>'
+    expect(wrapChapterHtmlWithNav(list, 2, raw)).toBe(wrapChapterHtmlWithNav(list, 3, raw))
+    // 超容量（>8）持续写入触发淘汰路径：旧内容重包结果仍正确
+    for (let i = 0; i <= 10; i++) {
+      wrapChapterHtmlWithNav(list, 1, `<p>c${i}</p>`)
+    }
+    expect(wrapChapterHtmlWithNav(list, 1, '<p>c0</p>')).toBe(
+      '<div class="h5_mainbody_block"><p>c0</p></div>'
+    )
+    expect(wrapChapterHtmlWithNav(list, 1, '<p>c10</p>')).toBe(
+      '<div class="h5_mainbody_block"><p>c10</p></div>'
+    )
+  })
 })
 
 describe('reader-viewport', () => {

@@ -1,19 +1,20 @@
 /**
  * 平移模式阅读器（flipMode='slide'）— 多章缓冲池 + 连续 transform track。
  *
- * phase-10 语义正名：本组件即「平移」翻页模式（整轨横滑），行为零改动；
+ * phase-10 语义正名：本组件即「平移」翻页模式（整轨横滑）；
  * 「覆盖」翻页见 paged/PagedReader。
  *
  * 源码对照：old-vue-reader/components/ReaderContent/index.vue 横划分支（template:12-42）。
  *
- * - track transform: translateX(-(globalPageIndex × stride) + dragOffset)，dragOffset 走
- *   reading-store 独立 slice（useTouchFlip），仅本组件订阅，不触发 Reader 根重渲染。
- * - transition 在 dragging/rebalancing/layoutLocked/loading/silentExpand 时抑制
+ * - track transform 由 useSlideMotionBridge 命令式独占写入（phase-11）：
+ *   拖拽跟手走 vanilla subscribe + rAF 合帧直写，本组件不订阅 dragOffset，
+ *   拖拽期间零 re-render；提交/回弹由桥接弹簧动画驱动（速度连续、可打断）。
+ * - 动画抑制（boot/rebalancing/layoutLocked/loading/silentExpand）由桥接直写终值
  *   （对照 shouldSuppressTrackTransition:324）。
  * - 章首/章末导航按钮：横划模式在 buffer 边界页渲染（对照 phase-02 任务 2 +
  *   Vue handlePrevChapter/handleNextChapter:1374-1408）。
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import type { ChapterContent, ChapterMeta } from '../../types'
 import type { SelectionBridgeHandle } from '../overlays/selection/SelectionLayer'
@@ -23,17 +24,15 @@ import {
   localToGlobal
 } from '../../core/chapter-buffer'
 import { getChapterNavFlags, wrapChapterHtmlWithNav } from '../../core/chapter-nav'
-import { getTrackTranslateX } from '../../core/pagination'
 import { useReadingStore } from '../../store/reading-store'
 import { useTouchFlip } from '../../hooks/useTouchFlip'
 import { usePagination } from '../../hooks/usePagination'
 import { useContentStyles } from '../../hooks/useContentStyles'
 import { useTrialEndTip } from '../../hooks/useTrialEndTip'
 import { useContentRichMedia } from '../../hooks/useContentRichMedia'
+import { useSlideMotionBridge } from '../../hooks/useSlideMotionBridge'
 import { BOOT_LOADING_FADE_MS } from '../../hooks/useNavigateToNavTarget'
 import './reader-content.css'
-
-const TRANSITION_MS = 280
 
 export interface HorizontalReaderProps {
   chapterList: ChapterMeta[]
@@ -67,12 +66,10 @@ export function HorizontalReader(props: HorizontalReaderProps): React.ReactNode 
   } = props
 
   const viewportRef = useRef<HTMLDivElement | null>(null)
+  const trackRef = useRef<HTMLDivElement | null>(null)
   const segmentBodyMapRef = useRef<Map<number, Element>>(new Map())
 
   const globalPageIndex = useReadingStore((s) => s.globalPageIndex)
-  const dragOffset = useReadingStore((s) => s.dragOffset)
-  const isRebalancing = useReadingStore((s) => s.isRebalancing)
-  const layoutLocked = useReadingStore((s) => s.layoutLocked)
   const buffer = useReadingStore((s) => s.buffer)
   const pageStride = useReadingStore((s) => s.pageStride)
   const pageWidth = useReadingStore((s) => s.pageWidth)
@@ -85,11 +82,13 @@ export function HorizontalReader(props: HorizontalReaderProps): React.ReactNode 
 
   const { rootStyle, contentBodyStyle } = useContentStyles()
 
-  // segment 列布局样式（对照 Vue segmentColumnStyle:350）：
-  // columnWidth 必须内联，依赖测量的 pageWidth；pageWidth=0 时不设（测量前单列兜底）。
-  const segmentColumnStyle: React.CSSProperties = pageWidth > 0
-    ? { columnWidth: `${pageWidth}px`, columnGap: `${pageGap}px` }
-    : {}
+  // 首屏遮罩镜像 ref：桥接抑制条件需要读取最新值（本地 state，不经 store）
+  const bootOverlayVisibleRef = useRef(true)
+
+  const { requestSync } = useSlideMotionBridge({
+    trackRef,
+    isSuppressedExtra: () => bootOverlayVisibleRef.current
+  })
 
   const getSegmentBody = useCallback((id: number): Element | null => {
     return segmentBodyMapRef.current.get(Number(id)) ?? null
@@ -122,9 +121,10 @@ export function HorizontalReader(props: HorizontalReaderProps): React.ReactNode 
     void runInitialLayout()
   }, [buffer.order.length, runInitialLayout])
 
-  // 首屏 / 淡出期间强制禁 transition（邻居章 silentExpand 重定位不得露出动画）
+  // 首屏 / 淡出期间由桥接抑制动画（邻居章 silentExpand 重定位不得露出动画）
   const [bootOverlayVisible, setBootOverlayVisible] = useState(true)
   const [bootOverlayLeaving, setBootOverlayLeaving] = useState(false)
+  bootOverlayVisibleRef.current = bootOverlayVisible
 
   useEffect(() => {
     if (!bootContentReady) {
@@ -142,46 +142,10 @@ export function HorizontalReader(props: HorizontalReaderProps): React.ReactNode 
     return () => window.clearTimeout(timer)
   }, [bootOverlayLeaving])
 
-  // isDragging 由 useTouchFlip 内部维护；此处通过 dragOffset!==0 近似判断抑制 transition
-  const suppressTransition =
-    !bootContentReady ||
-    bootOverlayVisible ||
-    dragOffset !== 0 ||
-    isRebalancing ||
-    layoutLocked ||
-    buffer.loading ||
-    buffer.silentExpand
-
-  const translateX = pageStride > 0 ? getTrackTranslateX(globalPageIndex, pageStride, dragOffset) : 0
-  const trackStyle: React.CSSProperties = pageStride
-    ? {
-        transform: `translateX(${translateX}px)`,
-        transition: suppressTransition ? 'none' : `transform ${TRANSITION_MS}ms ease-out`
-      }
-    : { transform: 'translateX(0px)' }
-
-  const segmentStyle = useCallback(
-    (id: number): React.CSSProperties => {
-      const segment = buffer.segments[id]
-      const cssVars = {
-        '--page-width': `${pageWidth}px`,
-        '--page-stride': `${pageStride}px`
-      } as React.CSSProperties
-      if (!segment || !pageStride) {
-        return { ...cssVars, minWidth: `${pageStride || 0}px`, flexShrink: 0 }
-      }
-      const widthPx = segment.widthPx
-      if (widthPx > 0) {
-        const order = buffer.order
-        const isLast = order.length > 0 && Number(id) === Number(order[order.length - 1])
-        const style: React.CSSProperties = { ...cssVars, width: `${widthPx}px`, flexShrink: 0 }
-        if (!isLast) style.marginRight = `${pageGap}px`
-        return style
-      }
-      return { ...cssVars, minWidth: `${pageStride}px`, flexShrink: 0 }
-    },
-    [buffer, pageStride, pageGap, pageWidth]
-  )
+  // 遮罩揭开 → 通知桥接重算（抑制解除，直写/弹簧语义由桥接判定）
+  useEffect(() => {
+    requestSync()
+  }, [bootOverlayVisible, requestSync])
 
   const segmentHtml = useCallback(
     (id: number): string => {
@@ -216,11 +180,14 @@ export function HorizontalReader(props: HorizontalReaderProps): React.ReactNode 
     chapterId === lastChapterInBuffer &&
     globalPageIndex >= getLastChapterPageGlobal(lastChapterInBuffer, buffer)
 
-  const setBodyRef = (id: number) => (el: Element | null) => {
-    if (el) segmentBodyMapRef.current.set(id, el)
-    else segmentBodyMapRef.current.delete(id)
-    registerBody?.(id, el)
-  }
+  const registerSegmentBody = useCallback(
+    (id: number, el: Element | null) => {
+      if (el) segmentBodyMapRef.current.set(id, el)
+      else segmentBodyMapRef.current.delete(id)
+      registerBody?.(id, el)
+    },
+    [registerBody]
+  )
 
   const handleContentClick = useCallback(
     (e: React.MouseEvent) => {
@@ -253,7 +220,6 @@ export function HorizontalReader(props: HorizontalReaderProps): React.ReactNode 
 
   void chapters
   void onError
-  void contentBodyStyle
 
   return (
     <div
@@ -270,33 +236,24 @@ export function HorizontalReader(props: HorizontalReaderProps): React.ReactNode 
         }}
         className="reader-content__viewport-h"
       >
-        <div className="reader-content__track" style={trackStyle} {...dragHandlers}>
-          {buffer.order.map((id) => {
-            const html = segmentHtml(id)
-            const blocked = isChapterBlocked(id)
-            return (
-              <div
-                key={id}
-                className={`reader-content__segment${isFlipping ? ' is-flipping' : ''}`}
-                data-segment-id={id}
-                style={segmentStyle(id)}
-              >
-                {blocked ? (
-                  <ChapterBlockedBody chapterId={id} chapterList={chapterList} />
-                ) : html ? (
-                  <div
-                    ref={setBodyRef(id)}
-                    className="reader-content__body reader-content__body--columns read_c"
-                    style={{ ...contentBodyStyle, ...segmentColumnStyle }}
-                    // eslint-disable-next-line react/no-danger
-                    dangerouslySetInnerHTML={{ __html: html }}
-                  />
-                ) : (
-                  <ChapterSkeleton />
-                )}
-              </div>
-            )
-          })}
+        <div className="reader-content__track" ref={trackRef} {...dragHandlers}>
+          {buffer.order.map((id, idx) => (
+            <SegmentView
+              key={id}
+              segmentId={id}
+              html={segmentHtml(id)}
+              blocked={isChapterBlocked(id)}
+              isFlipping={isFlipping}
+              widthPx={buffer.segments[id]?.widthPx ?? 0}
+              isLast={idx === buffer.order.length - 1}
+              pageWidth={pageWidth}
+              pageStride={pageStride}
+              pageGap={pageGap}
+              contentBodyStyle={contentBodyStyle}
+              chapterList={chapterList}
+              registerSegmentBody={registerSegmentBody}
+            />
+          ))}
         </div>
 
         {atBookStart && flags.hasPrev && (
@@ -354,6 +311,95 @@ export function HorizontalReader(props: HorizontalReaderProps): React.ReactNode 
     </div>
   )
 }
+
+interface SegmentViewProps {
+  segmentId: number
+  /** 包装后的章 HTML（经 wrapChapterHtmlWithNav，LRU 缓存引用稳定） */
+  html: string
+  blocked: boolean
+  isFlipping: boolean
+  widthPx: number
+  isLast: boolean
+  pageWidth: number
+  pageStride: number
+  pageGap: number
+  contentBodyStyle: React.CSSProperties
+  chapterList: ChapterMeta[]
+  registerSegmentBody: (id: number, el: Element | null) => void
+}
+
+/**
+ * 单章 segment（React.memo，phase-11）：拖拽期间父组件零 re-render，
+ * buffer patch / isFlipping 切换等低频渲染时 props 全为原始值或稳定引用，
+ * 命中缓存的 html 使 dangerouslySetInnerHTML diff O(1) 短路。
+ */
+const SegmentView = memo(function SegmentView(props: SegmentViewProps): React.ReactNode {
+  const {
+    segmentId,
+    html,
+    blocked,
+    isFlipping,
+    widthPx,
+    isLast,
+    pageWidth,
+    pageStride,
+    pageGap,
+    contentBodyStyle,
+    chapterList,
+    registerSegmentBody
+  } = props
+
+  const segmentStyle = useMemo((): React.CSSProperties => {
+    const cssVars = {
+      '--page-width': `${pageWidth}px`,
+      '--page-stride': `${pageStride}px`
+    } as React.CSSProperties
+    if (widthPx > 0) {
+      const style: React.CSSProperties = { ...cssVars, width: `${widthPx}px`, flexShrink: 0 }
+      if (!isLast) style.marginRight = `${pageGap}px`
+      return style
+    }
+    return { ...cssVars, minWidth: `${pageStride || 0}px`, flexShrink: 0 }
+  }, [widthPx, isLast, pageWidth, pageStride, pageGap])
+
+  // 列布局样式（对照 Vue segmentColumnStyle:350）：columnWidth 必须内联，
+  // 依赖测量的 pageWidth；pageWidth=0 时不设（测量前单列兜底）。
+  const bodyStyle = useMemo((): React.CSSProperties => {
+    if (pageWidth <= 0) return contentBodyStyle
+    return { ...contentBodyStyle, columnWidth: `${pageWidth}px`, columnGap: `${pageGap}px` }
+  }, [contentBodyStyle, pageWidth, pageGap])
+
+  // memoize {__html} 避免每次 re-render 创建新对象导致
+  // React 重置 innerHTML 销毁已注入的 <mark> 划线元素
+  const innerHtml = useMemo(() => ({ __html: html }), [html])
+
+  const bodyRef = useCallback(
+    (el: Element | null) => registerSegmentBody(segmentId, el),
+    [segmentId, registerSegmentBody]
+  )
+
+  return (
+    <div
+      className={`reader-content__segment${isFlipping ? ' is-flipping' : ''}`}
+      data-segment-id={segmentId}
+      style={segmentStyle}
+    >
+      {blocked ? (
+        <ChapterBlockedBody chapterId={segmentId} chapterList={chapterList} />
+      ) : html ? (
+        <div
+          ref={bodyRef}
+          className="reader-content__body reader-content__body--columns read_c"
+          style={bodyStyle}
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={innerHtml}
+        />
+      ) : (
+        <ChapterSkeleton />
+      )}
+    </div>
+  )
+})
 
 function ChapterSkeleton(): React.ReactNode {
   return (

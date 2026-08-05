@@ -6,20 +6,17 @@
  * - 规范流本体（当前页容器，children 为真实章 body，划线/批注/选词/跳转全部作用其上）；
  * - 相邻页克隆（cloneHostRef 空宿主，由 usePageClones 注入 cloneNode DOM）。
  *
+ * phase-11：整页 transform/transition 移出 JSX，由 useCoverMotionBridge 经
+ * rootRef 命令式独占写入（拖拽跟手 rAF 直写 + 弹簧动画）；本组件只保留
+ * z 序/阴影 class/CSS 变量/切片位移等结构属性。
+ *
  * 下期仿真翻页（page-flip）以本组件作为页级渲染接入点。
  */
-import type { CSSProperties, ReactNode, RefObject, TransitionEvent } from 'react'
-
-/** 覆盖动画时长/缓动：对照 HorizontalReader TRANSITION_MS = 280 ease-out。 */
-export const COVER_TRANSITION_MS = 280
+import type { CSSProperties, ReactNode, RefObject } from 'react'
 
 export interface PageSurfaceViewProps {
   /** 层叠顺序：底层静止页 1 / 顶层移动页 2（resolveCoverLayers 的 z 序约定） */
   zIndex: number
-  /** 整页位移（拖拽跟手/补间动画驱动，静止页恒 0） */
-  translateX: number
-  /** 是否启用 280ms ease-out 过渡（仅补间动画期；拖拽跟手期必须为 false） */
-  animated: boolean
   /** 是否挂移动页前缘阴影（.paged-reader__page--moving） */
   moving: boolean
   /** 页内容切片位移：-localPageIndex × pageStride */
@@ -32,30 +29,26 @@ export interface PageSurfaceViewProps {
   segmentId?: number
   /** 克隆承载模式：slice 空宿主 ref，usePageClones 向其中 appendChild 克隆 DOM */
   cloneHostRef?: RefObject<HTMLDivElement | null>
-  /** 补间结束回调（仅移动页会真正触发 transform 过渡） */
-  onMovingTransitionEnd?: (e: TransitionEvent) => void
+  /** 页容器根元素 ref：运动桥接命令式写入 transform 的触点 */
+  rootRef?: RefObject<HTMLDivElement | null>
   children?: ReactNode
 }
 
 export function PageSurfaceView(props: PageSurfaceViewProps): ReactNode {
   const {
     zIndex,
-    translateX,
-    animated,
     moving,
     sliceTranslateX,
     pageWidth,
     pageStride,
     segmentId,
     cloneHostRef,
-    onMovingTransitionEnd,
+    rootRef,
     children
   } = props
 
   const pageStyle = {
     zIndex,
-    transform: `translateX(${translateX}px)`,
-    transition: animated ? `transform ${COVER_TRANSITION_MS}ms ease-out` : 'none',
     '--page-width': `${pageWidth}px`,
     '--page-stride': `${pageStride}px`
   } as CSSProperties
@@ -66,10 +59,10 @@ export function PageSurfaceView(props: PageSurfaceViewProps): ReactNode {
 
   return (
     <div
+      ref={rootRef}
       className={`paged-reader__page${cloneHostRef ? ' paged-reader__page--clone' : ''}${moving ? ' paged-reader__page--moving' : ''}`}
       style={pageStyle}
       data-segment-id={segmentId}
-      onTransitionEnd={onMovingTransitionEnd}
     >
       <div className="paged-reader__slice" style={sliceStyle} ref={cloneHostRef}>
         {children}

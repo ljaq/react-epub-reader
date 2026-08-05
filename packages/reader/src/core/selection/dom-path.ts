@@ -192,10 +192,33 @@ export function getDomsInView(
   return result
 }
 
-/** 由坐标命中所属 body（章节正文容器）。对齐 Vue selection-dom-path.js:167 */
+/**
+ * 由坐标命中所属 body（章节正文容器）。对齐 Vue selection-dom-path.js:167。
+ *
+ * 修复：覆盖模式隐藏测量流 bodies 在 Map 中排序优先于当前页 body，
+ * 其 getBoundingClientRect（因长章节内容宽）可能延伸回可见区导致误命中；
+ * 此时 caretRangeFromPoint 遵循 pointer-events:none 返回可见文本节点，
+ * body.contains() 不匹配，选区静默失败。
+ *
+ * 解法：优先走 elementFromPoint（遵循 pointer-events:none/visibility:hidden
+ * 等 CSS 规则），找到实际 hit-target 后再判定所属 body；回退走原 rect 判定。
+ */
 export function findBodyFromPoint(x: number, y: number, bodies: Element[] | null): Element | null {
+  const list = bodies || []
+  if (list.length === 0) return null
+
+  // 优先：elementFromPoint 遵循 pointer-events / visibility 规则，
+  // 自动跳过 hidden-flows 内的元素
+  const hitEl = document.elementFromPoint(x, y)
+  if (hitEl) {
+    for (const body of list) {
+      if (body.contains(hitEl)) return body
+    }
+  }
+
+  // 回退：rect 判定（低版本浏览器 / elementFromPoint 为 null）
   return (
-    (bodies || []).find(body => {
+    list.find(body => {
       const rect = body.getBoundingClientRect()
       return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
     }) || null

@@ -11,12 +11,17 @@
  *
  * 事件策略：React 合成 onPointerDown/Move/Up/Cancel + setPointerCapture，
  * 统一处理所有 pointerType（mouse/touch/pen），避免 touch 事件 passive 问题。
- * dragOffset 实时写 reading-store 独立 slice，仅 track transform 重渲染。
+ * dragOffset 实时写 reading-store 独立 slice（渲染层经运动桥接命令式消费，phase-11）。
+ *
+ * phase-11 物理翻页：
+ * - pointermove 维护最近 ~100ms 采样（t,x），松手计算速度 px/ms；
+ * - fling 判定（resolveDragTurnWithFling）：快甩无视 40px 位置阈值直接翻页；
+ * - 松手速度写 store.dragReleaseVelocity，由运动桥接消费为弹簧初速度。
  */
 import { useCallback, useRef } from 'react'
 import {
   applyGlobalDragResistance,
-  resolveGlobalDragTurn,
+  resolveDragTurnWithFling,
   type DragTurnResult
 } from '../core/pagination'
 import { useReadingStore } from '../store/reading-store'
@@ -24,6 +29,9 @@ import { useUiStore } from '../store/ui-store'
 
 export const DRAG_THRESHOLD = 40
 export const AXIS_LOCK_THRESHOLD = 8
+
+/** 速度采样窗口（ms）：只取松手前最近一段位移估算瞬时速度 */
+export const VELOCITY_SAMPLE_WINDOW_MS = 100
 
 export interface UseTouchFlipInput {
   enabled: boolean
@@ -56,6 +64,7 @@ export function useTouchFlip(input: UseTouchFlipInput): {
 
   const setDragOffset = useReadingStore((s) => s.setDragOffset)
   const setDragStartX = useReadingStore((s) => s.setDragStartX)
+  const setDragReleaseVelocity = useReadingStore((s) => s.setDragReleaseVelocity)
   const setGlobalPageIndex = useReadingStore((s) => s.setGlobalPageIndex)
   const setFlipping = useReadingStore((s) => s.setFlipping)
   const toggleUi = useUiStore((s) => s.toggleUi)
@@ -70,6 +79,26 @@ export function useTouchFlip(input: UseTouchFlipInput): {
   const recentlyDraggedRef = useRef(false)
   const dragResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const flipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** 速度采样（t=timeStamp ms, x=clientX）：松手前 ~100ms 窗口 */
+  const samplesRef = useRef<{ t: number; x: number }[]>([])
+
+  const pushSample = useCallback((t: number, x: number) => {
+    const samples = samplesRef.current
+    samples.push({ t, x })
+    const cutoff = t - VELOCITY_SAMPLE_WINDOW_MS
+    while (samples.length > 2 && samples[0].t < cutoff) samples.shift()
+  }, [])
+
+  /** 松手速度（px/ms，向左为负）；采样不足/零时长返回 0 */
+  const computeReleaseVelocity = useCallback((): number => {
+    const samples = samplesRef.current
+    if (samples.length < 2) return 0
+    const first = samples[0]
+    const last = samples[samples.length - 1]
+    const dt = last.t - first.t
+    if (dt <= 0) return 0
+    return (last.x - first.x) / dt
+  }, [])
 
   const markRecentlyDragged = useCallback(() => {
     recentlyDraggedRef.current = true
@@ -113,12 +142,16 @@ export function useTouchFlip(input: UseTouchFlipInput): {
     if (!draggingRef.current) return
     const state = useReadingStore.getState()
     const totalPages = Math.max(1, state.buffer.totalPages || 1)
-    const action = resolveGlobalDragTurn(
+    // 松手速度：fling 判定 + 弹簧初速度（须在覆写回调/默认切页前写入 store）
+    const velocity = computeReleaseVelocity()
+    const action = resolveDragTurnWithFling(
       state.globalPageIndex,
       totalPages,
       lastDxRef.current,
+      velocity,
       DRAG_THRESHOLD
     )
+    setDragReleaseVelocity(velocity)
     draggingRef.current = false
     pointerIdRef.current = null
     axisLockRef.current = null
@@ -133,14 +166,15 @@ export function useTouchFlip(input: UseTouchFlipInput): {
     if (action === 'next-page') turnPage(1)
     else if (action === 'prev-page') turnPage(-1)
     setDragOffset(0)
-    // 翻页动画（280ms）结束后再隐藏阴影
+    // 翻页阴影复位兜底：正常路径由弹簧 onComplete 驱动（运动桥接）；
+    // 抑制期直写/异常路径由本定时器兜底（弹簧硬超时 600ms + 余量）
     if (flipTimerRef.current) clearTimeout(flipTimerRef.current)
     flipTimerRef.current = setTimeout(() => {
       flipTimerRef.current = null
       // 若期间又开始新拖拽，保持 true
       if (!draggingRef.current) setFlipping(false)
-    }, 290)
-  }, [turnPage, setDragOffset, setDragStartX, markRecentlyDragged, setFlipping])
+    }, 650)
+  }, [turnPage, setDragOffset, setDragStartX, setDragReleaseVelocity, computeReleaseVelocity, markRecentlyDragged, setFlipping])
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -160,6 +194,7 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       axisLockRef.current = null
       movedRef.current = false
       draggingRef.current = true
+      samplesRef.current = [{ t: e.timeStamp, x: e.clientX }]
       setDragOffset(0)
       setDragStartX(e.clientX)
     },
@@ -182,9 +217,10 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       e.preventDefault()
       movedRef.current = true
       lastDxRef.current = dx
+      pushSample(e.timeStamp, e.clientX)
       updateDragOffset(dx)
     },
-    [enabled, updateDragOffset, setFlipping]
+    [enabled, updateDragOffset, setFlipping, pushSample]
   )
 
   const onPointerUp = useCallback(
@@ -195,9 +231,11 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       } catch {
         // ignore
       }
+      // 松手点计入速度采样（最后一个 move 与 up 之间可能有间隔）
+      if (draggingRef.current) pushSample(e.timeStamp, e.clientX)
       endDrag()
     },
-    [endDrag]
+    [endDrag, pushSample]
   )
 
   const onPointerCancel = useCallback(() => {

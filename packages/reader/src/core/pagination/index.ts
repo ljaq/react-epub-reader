@@ -293,6 +293,44 @@ export function resolveGlobalDragTurn(
   return 'stay'
 }
 
+/**
+ * fling 甩动速度阈值（px/ms ≈ 300px/s，phase-11）。
+ * 松手速度达到阈值即判定 intentional 翻页，无视位置阈值（对齐掌阅/iBooks 手感）。
+ */
+export const FLING_VELOCITY_THRESHOLD = 0.3
+
+/**
+ * 位置阈值 + fling 速度的合成翻页判定（phase-11）：
+ * - 先走 resolveGlobalDragTurn 位置阈值（40px 行为保持）；
+ * - 判定 stay 时再查 fling：|velocity| ≥ 阈值 且速度方向与拖拽位移方向一致
+ *  （防回甩误判），且目标方向有页可翻（边界钳制同位置判定）。
+ *
+ * velocity：松手瞬间拖拽速度 px/ms（向左为负 → next-page）。
+ */
+export function resolveDragTurnWithFling(
+  globalPageIndex: number,
+  totalPages: number,
+  deltaX: number,
+  velocity: number,
+  threshold: number = 40
+): DragTurnResult {
+  const byPosition = resolveGlobalDragTurn(globalPageIndex, totalPages, deltaX, threshold)
+  if (byPosition !== 'stay') {
+    return byPosition
+  }
+  if (Math.abs(velocity) < FLING_VELOCITY_THRESHOLD) {
+    return 'stay'
+  }
+  // 速度方向必须与拖拽位移方向一致（位移为 0 的纯甩动也允许，取速度方向）
+  if (deltaX !== 0 && Math.sign(velocity) !== Math.sign(deltaX)) {
+    return 'stay'
+  }
+  if (velocity < 0) {
+    return globalPageIndex < totalPages - 1 ? 'next-page' : 'stay'
+  }
+  return globalPageIndex > 0 ? 'prev-page' : 'stay'
+}
+
 /** 章内拖拽阻尼，转发 applyGlobalDragResistance。对齐 Vue pagination.js:226 */
 export function applyDragResistance(
   dragOffset: number,

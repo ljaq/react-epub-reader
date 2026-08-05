@@ -49,6 +49,11 @@ interface ReadingState {
   dragOffset: number
   /** 当前横向拖拽起点 clientX（pointerdown 记录，endDrag 复位 0）；覆盖模式右滑前缘锚定手指用 */
   dragStartX: number
+  /**
+   * 松手瞬间拖拽速度（px/ms，phase-11）：运动桥接启动弹簧时读取作为初速度，
+   * 读取后即复位（消费型字段，勿用于渲染订阅）。
+   */
+  dragReleaseVelocity: number
   isRebalancing: boolean
   layoutLocked: boolean
   /** 拖拽 + 翻页动画期间为 true，用于翻页阴影显隐 */
@@ -87,6 +92,7 @@ interface ReadingState {
   setGlobalPageIndex: (index: number) => void
   setDragOffset: (offset: number) => void
   setDragStartX: (x: number) => void
+  setDragReleaseVelocity: (v: number) => void
   setRebalancing: (value: boolean) => void
   setLayoutLocked: (value: boolean) => void
   setFlipping: (value: boolean) => void
@@ -130,6 +136,7 @@ export const useReadingStore = create<ReadingState>((set) => ({
   globalPageIndex: 0,
   dragOffset: 0,
   dragStartX: 0,
+  dragReleaseVelocity: 0,
   isRebalancing: false,
   layoutLocked: false,
   isFlipping: false,
@@ -180,6 +187,7 @@ export const useReadingStore = create<ReadingState>((set) => ({
 
   setDragOffset: (offset) => set({ dragOffset: offset }),
   setDragStartX: (x) => set({ dragStartX: Math.max(0, Number(x) || 0) }),
+  setDragReleaseVelocity: (v) => set({ dragReleaseVelocity: Number(v) || 0 }),
   setRebalancing: (value) => set({ isRebalancing: value }),
   setLayoutLocked: (value) => set({ layoutLocked: value }),
   setFlipping: (value) => set({ isFlipping: value }),

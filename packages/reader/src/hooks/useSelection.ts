@@ -71,7 +71,9 @@ export function useSelection(input: UseSelectionInput) {
   const selection = useAnnotationStore((s) => s.selection)
   const setSelection = useAnnotationStore((s) => s.setSelection)
   const clearSelection = useAnnotationStore((s) => s.clearSelection)
-  const dragOffset = useReadingStore((s) => s.dragOffset)
+  // 布尔选择器（phase-11）：拖拽开始/结束各一次 re-render；
+  // 拖拽期间选区位置的逐帧跟随由下方命令式订阅承担，不经 React render
+  const isFlipDragging = useReadingStore((s) => s.dragOffset !== 0)
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -196,11 +198,29 @@ export function useSelection(input: UseSelectionInput) {
   )
 
   useEffect(() => {
-    if (dragOffset !== 0) {
+    if (isFlipDragging) {
       cancelPendingLongPress()
     }
     refreshSelectionPosition()
-  }, [dragOffset, refreshSelectionPosition, cancelPendingLongPress])
+  }, [isFlipDragging, refreshSelectionPosition, cancelPendingLongPress])
+
+  // 拖拽期间选区位置逐帧跟随（对齐 Vue dragOffset watcher）：命令式订阅 +
+  // rAF 合帧直调刷新，旁路 React render（phase-11 热路径优化）
+  useEffect(() => {
+    let rafId = 0
+    const unsub = useReadingStore.subscribe((state, prev) => {
+      if (state.dragOffset === prev.dragOffset || state.dragOffset === 0) return
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = 0
+        refreshSelectionPosition()
+      })
+    })
+    return () => {
+      unsub()
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [refreshSelectionPosition])
 
   useEffect(() => {
     const root = getScrollRoot()
