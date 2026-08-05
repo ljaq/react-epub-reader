@@ -138,7 +138,11 @@ export const SelectionLayer = forwardRef<SelectionBridgeHandle, SelectionLayerPr
         noteBadgesMode === 'fixed'
           ? fixedBadgesRef.current
           : noteBadgesContainerRef?.current || null
-      syncNoteBadges(container, getContentBodies(), {
+      // 过滤掉隐藏测量流中的 body（PagedReader 邻居章），避免跨章角标泄露
+      const bodies = getContentBodies().filter(
+        (body) => !body.closest('.paged-reader__hidden-flows')
+      )
+      syncNoteBadges(container, bodies, {
         mode: horizontalEnabled ? 'horizontal' : 'vertical',
         viewportEl: getViewportEl(),
         resolveChapterId: (rootEl) =>

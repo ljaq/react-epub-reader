@@ -118,6 +118,7 @@
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
   tap-highlight-color: transparent;
+  text-align: justify;
 }
 
 .reader-content__body::selection,
