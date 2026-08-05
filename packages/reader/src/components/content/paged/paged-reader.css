@@ -13,12 +13,16 @@
    除 visibility:hidden 外必须再 translate 移出视口：选区 findBodyFromPoint 等命中检测
    基于 getBoundingClientRect 包含判断，visibility 不影响 rect——若隐藏流 rect 仍铺满
    视口，长按会误命中隐藏 body 导致选中失败（平移模式邻居章天然在视口外，语义对齐）。
-   transform 不影响布局尺寸，列测量结果与可见态一致。 */
+   transform 不影响布局尺寸，列测量结果与可见态一致。
+   left/right: 0 撑满 viewport-h padding-box（= 屏幕全宽 375），与 .paged-reader__page
+   同步。注意不能用负 var(--reader-h-pad-x)：那会撑出 viewport-h 之外使 page 宽 = 415，
+   body content area = 375 ≠ pageWidth = 335，导致列宽被重算填满 375、列起点贴边、
+   翻页累积偏移 N × (columnWidth+columnGap-pageStride) = N × 40px。 */
 .paged-reader__hidden-flows {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
+  right: 0;
   height: 100%;
   transform: translateX(-200%);
   visibility: hidden;
@@ -35,10 +39,24 @@
   contain-intrinsic-size: auto 300px 100%;
 }
 
-/* 页容器：页尺寸 overflow:hidden 盒，分层堆叠（z-index 由组件内联）。 */
+/* 页容器：页尺寸 overflow:hidden 盒，分层堆叠（z-index 由组件内联）。
+   覆盖模式核心隐喻：page 撑满屏幕到最边缘（含 viewport-h padding 区域），翻页时
+   当前页从屏幕最右/最左滑出，而非从内缩 20px 处开始。
+   left/right: 0 撑满 viewport-h padding-box（= 屏幕全宽 375）：position:absolute 的
+   containing block 是 viewport-h 的 padding box（含 padding 区域），left:0;right:0
+   即撑满该盒。page 宽 = viewport clientWidth = 屏幕宽（375），body content area =
+   pageWidth = 335（由 .reader-content--paged .reader-content__body--columns 水平 padding
+   提供），列宽 = columnWidth = 335 不被重算，列起点屏幕 = body 起点(0) + padding-left(20)
+   = 20（对齐平移模式视觉位置）。
+   不能用负 left/right 撑出 viewport-h 之外：会让 page 宽 = 415 > 屏幕宽，body content
+   area = 375 ≠ pageWidth，列宽被强制重算填满 375，列起点贴边 0、翻页累积偏移 N × 40px。
+   垂直仍 0 由 viewport-h 决定高度。 */
 .paged-reader__page {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   overflow: hidden;
   background: var(--reader-bg);
   will-change: transform;
@@ -75,4 +93,16 @@
   z-index: 1;
   opacity: var(--cover-overlay, 0);
   will-change: opacity;
+}
+
+/* 覆盖模式 body 居中：page 撑满屏幕宽后，body 自身水平 padding = --reader-h-pad-x
+   让 body content area = pageWidth（getReaderContentWidth = viewport clientWidth - 2×pad），
+   列宽 = columnWidth = pageWidth，列起点 = padding-left = 20px → 对齐平移模式视觉
+   （平移模式列起点 = viewport content area 左缘 = 同样 20px）。
+   不破坏原 .reader-content__body--columns 垂直 padding（24px top / 48px bottom + safe-area）
+   与竖直全屏阴影逻辑（::after inset:0 覆盖 segment 全高，由 body 垂直 padding 决定高度）。
+   克隆源（hidden-flow 内 body）同样匹配此规则 → cloneNode 后视觉一致。 */
+.reader-content--paged .reader-content__body--columns {
+  padding-left: var(--reader-h-pad-x);
+  padding-right: var(--reader-h-pad-x);
 }

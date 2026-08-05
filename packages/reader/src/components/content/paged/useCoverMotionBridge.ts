@@ -155,10 +155,12 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
           sessionKeyRef.current = key
           callbacksRef.current.onDragSessionChange({ direction, adjacent })
         }
+        // 覆盖模式 page 撑满屏幕（宽 = pageStride = viewport clientWidth），翻页距离 = pageStride
+        // 而非 pageWidth，否则 page 滑出后右缘残留 pageGap(40px) 在屏幕上。
         const movingX = getCoverMovingTranslateX({
           direction,
           dragOffset: s.dragOffset,
-          pageWidth: s.pageWidth,
+          pageWidth: s.pageStride,
           hasAdjacent: adjacent !== null,
           dragStartX: s.dragStartX
         })
@@ -170,7 +172,7 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
 
         // phase-13 视差翻页：静态页 1/4 速度位移 + 黑色半透明遮罩渐隐
         if (adjacent !== null) {
-          const pw = s.pageWidth
+          const pw = s.pageStride
           const staticX = getCoverStaticParallaxX(movingX, pw)
           const overlay = getCoverOverlayOpacity(movingX, pw, direction)
           writeTo(staticWhich, staticX)
@@ -226,11 +228,12 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
       const staticWhich: 'current' | 'clone' = which === 'current' ? 'clone' : 'current'
 
       // phase-13 视差：弹簧起始帧也写静态页 + 遮罩
+      // 覆盖模式视差/遮罩基于 page 滑动距离 = pageStride（page 宽），与拖拽路径一致。
       if (direction !== undefined) {
         const s = useReadingStore.getState()
-        if (s.pageWidth > 0) {
-          const initStaticX = getCoverStaticParallaxX(fromX, s.pageWidth)
-          const initOverlay = getCoverOverlayOpacity(fromX, s.pageWidth, direction)
+        if (s.pageStride > 0) {
+          const initStaticX = getCoverStaticParallaxX(fromX, s.pageStride)
+          const initOverlay = getCoverOverlayOpacity(fromX, s.pageStride, direction)
           writeTo(staticWhich, initStaticX)
           writeOverlay(staticWhich, initOverlay)
         }
@@ -245,9 +248,9 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
           // phase-13 视差：弹簧每帧同步更新静态页
           if (direction !== undefined) {
             const s = useReadingStore.getState()
-            if (s.pageWidth > 0) {
-              writeTo(staticWhich, getCoverStaticParallaxX(x, s.pageWidth))
-              writeOverlay(staticWhich, getCoverOverlayOpacity(x, s.pageWidth, direction))
+            if (s.pageStride > 0) {
+              writeTo(staticWhich, getCoverStaticParallaxX(x, s.pageStride))
+              writeOverlay(staticWhich, getCoverOverlayOpacity(x, s.pageStride, direction))
             }
           }
         },

@@ -22,6 +22,10 @@
   flex-direction: column;
   overflow: hidden;
   touch-action: pan-y;
+  /* 横排左右间距统一变量：viewport-h 水平 padding（平移/覆盖共用，决定 pageWidth 测量）
+     + 覆盖模式 body 水平 padding（paged-reader.css，让列起点对齐平移模式视觉）。
+     对齐旧 Vue index.vue:2448 padding:24px 20px 48px 的水平 20px。 */
+  --reader-h-pad-x: 20px;
 }
 
 .reader-content--vertical {
@@ -41,7 +45,13 @@
   min-height: 0;
   overflow: hidden;
   box-sizing: border-box;
-  padding: 0;
+  /* 水平 padding 恢复到容器级（对齐旧 Vue），getReaderContentWidth 会自动减去水平 padding
+     使 pageWidth = viewport content area。
+     平移模式：body--columns 无水平 padding 即填满该宽度，列起点=body 左缘=segment 左缘，
+     ::after gradient 与列边界对齐。覆盖模式：page 容器撑满 padding-box（含本 padding 区域），
+     body 水平 padding 由 paged-reader.css 单独提供，列起点同样 = 20px。
+     垂直 padding 留在 body--columns 上以保留竖直全屏阴影（::after inset:0 覆盖 segment 全高）。 */
+  padding: 0 var(--reader-h-pad-x);
   touch-action: none;
   background: var(--reader-bg);
 }
@@ -131,16 +141,11 @@
   box-sizing: border-box;
 }
 
-/* 横划模式 column 充满屏幕宽度，内容左右留白通过块级元素 padding 实现
-   （而非 body--columns padding，否则 column 缩小、阴影不对齐屏幕边缘） */
-.reader-content__body--columns p,
-.reader-content__body--columns h1,
-.reader-content__body--columns h2,
-.reader-content__body--columns h3,
-.reader-content__body--columns li {
-  padding-left: 20px;
-  padding-right: 20px;
-}
+/* 平移模式：横排左右间距由 .reader-content__viewport-h 的水平 padding（--reader-h-pad-x）
+   统一提供，覆盖所有块级元素（含 div/blockquote 等非枚举标签），对齐旧 Vue index.vue:2448。
+   body--columns 保持 padding:0 水平，列起点=body 左缘，::after gradient 与列边界对齐。
+   覆盖模式例外：body 水平 padding 由 paged-reader.css 的
+   .reader-content--paged .reader-content__body--columns 提供（page 撑满屏幕，body 自居中）。 */
 
 .reader-content--vertical .reader-content__body {
   padding:

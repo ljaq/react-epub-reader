@@ -12,10 +12,7 @@
  * - segmentOffsets 同步自 buffer，供横划 track 偏移计算用。
  */
 import { create } from 'zustand'
-import {
-  clampPageIndex,
-  PAGE_COLUMN_GAP
-} from '../core/pagination'
+import { clampPageIndex, PAGE_COLUMN_GAP } from '../core/pagination'
 import type { NavTarget } from '../core/reading-position/nav-target'
 import {
   createEmptyBuffer,
@@ -128,7 +125,7 @@ function syncChapterFromGlobal(state: ReadingState): Partial<ReadingState> {
  * 阅读引擎高频 store。dragOffset/globalPageIndex/isRebalancing/layoutLocked
  * 均在此独立 slice，组件按需 selector 订阅，避免全树重渲染。
  */
-export const useReadingStore = create<ReadingState>((set) => ({
+export const useReadingStore = create<ReadingState>(set => ({
   chapterId: 0,
   pageIndex: 0,
   pageCount: 1,
@@ -162,13 +159,12 @@ export const useReadingStore = create<ReadingState>((set) => ({
     atChapterEnd: false
   },
 
-  setChapterId: (id) => set({ chapterId: Number(id) }),
+  setChapterId: id => set({ chapterId: Number(id) }),
 
-  setPageIndex: (index) =>
-    set((s) => ({ pageIndex: clampPageIndex(index, s.pageCount) })),
+  setPageIndex: index => set(s => ({ pageIndex: clampPageIndex(index, s.pageCount) })),
 
-  setPageCount: (count) =>
-    set((s) => {
+  setPageCount: count =>
+    set(s => {
       const nextCount = Math.max(1, Number(count) || 1)
       return {
         pageCount: nextCount,
@@ -176,8 +172,8 @@ export const useReadingStore = create<ReadingState>((set) => ({
       }
     }),
 
-  setGlobalPageIndex: (index) =>
-    set((s) => {
+  setGlobalPageIndex: index =>
+    set(s => {
       const totalPages = Math.max(1, s.buffer.totalPages || 1)
       const nextGlobal = clampPageIndex(index, totalPages)
       const draft: Partial<ReadingState> = { globalPageIndex: nextGlobal }
@@ -185,29 +181,27 @@ export const useReadingStore = create<ReadingState>((set) => ({
       return draft
     }),
 
-  setDragOffset: (offset) => set({ dragOffset: offset }),
-  setDragStartX: (x) => set({ dragStartX: Math.max(0, Number(x) || 0) }),
-  setDragReleaseVelocity: (v) => set({ dragReleaseVelocity: Number(v) || 0 }),
-  setRebalancing: (value) => set({ isRebalancing: value }),
-  setLayoutLocked: (value) => set({ layoutLocked: value }),
-  setFlipping: (value) => set({ isFlipping: value }),
-  setFlipAnimating: (value) => set({ flipAnimating: value }),
+  setDragOffset: offset => set({ dragOffset: offset }),
+  setDragStartX: x => set({ dragStartX: Math.max(0, Number(x) || 0) }),
+  setDragReleaseVelocity: v => set({ dragReleaseVelocity: Number(v) || 0 }),
+  setRebalancing: value => set({ isRebalancing: value }),
+  setLayoutLocked: value => set({ layoutLocked: value }),
+  setFlipping: value => set({ isFlipping: value }),
+  setFlipAnimating: value => set({ flipAnimating: value }),
 
-  setPageGeometry: ({ pageWidth, pageGap, pageStride }) =>
-    set({ pageWidth, pageGap, pageStride }),
+  setPageGeometry: ({ pageWidth, pageGap, pageStride }) => set({ pageWidth, pageGap, pageStride }),
 
-  setMeasuredContentWidth: (width) =>
-    set({ measuredContentWidth: Math.max(0, Number(width) || 0) }),
+  setMeasuredContentWidth: width => set({ measuredContentWidth: Math.max(0, Number(width) || 0) }),
 
-  setBuffer: (buffer) =>
-    set((s) => {
+  setBuffer: buffer =>
+    set(s => {
       const draft: Partial<ReadingState> = { buffer }
       Object.assign(draft, syncChapterFromGlobal({ ...s, ...draft }))
       return draft
     }),
 
-  patchBuffer: (patch) =>
-    set((s) => {
+  patchBuffer: patch =>
+    set(s => {
       const nextBuffer = { ...s.buffer, ...patch }
       const draft: Partial<ReadingState> = { buffer: nextBuffer }
       Object.assign(draft, syncChapterFromGlobal({ ...s, ...draft }))
@@ -215,17 +209,17 @@ export const useReadingStore = create<ReadingState>((set) => ({
     }),
 
   updateBufferPageCounts: (pageCounts, pageStride = 0) =>
-    set((s) => {
+    set(s => {
       const anchorChapterId = s.chapterId
       const anchorPageIndex = s.pageIndex
       // 深拷贝 segments（rebuildSegmentOffsets 会原地改 offsetPages/offsetPx/widthPx），
       // 但保持 order 引用不变，避免 usePagination 的 subscribe 误判 order 变化触发循环。
       const nextSegments: Record<number, BufferSegment> = {}
-      s.buffer.order.forEach((id) => {
+      s.buffer.order.forEach(id => {
         const seg = s.buffer.segments[id]
         if (seg) nextSegments[id] = { ...seg }
       })
-      Object.keys(pageCounts).forEach((key) => {
+      Object.keys(pageCounts).forEach(key => {
         const id = Number(key)
         const seg = nextSegments[id]
         if (seg) seg.pageCount = Math.max(1, Number(pageCounts[key]) || 1)
@@ -237,10 +231,7 @@ export const useReadingStore = create<ReadingState>((set) => ({
       }
       rebuildSegmentOffsets(nextBuffer, pageStride)
       const totalPages = Math.max(1, nextBuffer.totalPages || 1)
-      const nextGlobal = clampPageIndex(
-        localToGlobal(anchorChapterId, anchorPageIndex, nextBuffer),
-        totalPages
-      )
+      const nextGlobal = clampPageIndex(localToGlobal(anchorChapterId, anchorPageIndex, nextBuffer), totalPages)
       const draft: Partial<ReadingState> = {
         buffer: nextBuffer,
         globalPageIndex: nextGlobal
@@ -249,26 +240,26 @@ export const useReadingStore = create<ReadingState>((set) => ({
       return draft
     }),
 
-  setBufferReady: (value) => set({ bufferReady: value }),
+  setBufferReady: value => set({ bufferReady: value }),
   markInitialLayoutSettled: () => set({ initialLayoutSettled: true }),
   markBootContentReady: () => set({ bootContentReady: true }),
-  setNeighborPreloadStarted: (value) => set({ neighborPreloadStarted: value }),
+  setNeighborPreloadStarted: value => set({ neighborPreloadStarted: value }),
 
-  setNavTarget: (target) => set({ navTarget: target }),
+  setNavTarget: target => set({ navTarget: target }),
   clearNavTarget: () => set({ navTarget: null }),
 
-  updateReadingSnapshot: (partial) =>
-    set((s) => ({
+  updateReadingSnapshot: partial =>
+    set(s => ({
       readingSnapshot: { ...s.readingSnapshot, ...partial }
     })),
 
   resetReadingPosition: () =>
-    set((s) => ({
+    set(s => ({
       pageIndex: 0,
       globalPageIndex: localToGlobal(s.chapterId, 0, s.buffer)
     })),
 
-  resetForChapterSwitch: (_chapterId) =>
+  resetForChapterSwitch: _chapterId =>
     set({
       neighborPreloadStarted: false,
       navTarget: null

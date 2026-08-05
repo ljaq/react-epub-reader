@@ -219,7 +219,10 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
       state.setDragOffset(0)
       if (anim.adjacent) showClone(anim.adjacent)
       setAnimState(anim)
-      const pw = state.pageWidth
+      // 覆盖模式 page 撑满屏幕（宽 = viewport clientWidth = pageStride = pageWidth + pageGap），
+      // 翻页距离必须 = page 宽（pageStride）而非内容 pageWidth，否则 page 滑出后右缘残留
+      // pageGap(40px) 在屏幕上（"左边缘没到达屏幕左缘"问题）。
+      const pw = state.pageStride
       const which: 'current' | 'clone' =
         anim.direction === 1 || !anim.adjacent ? 'current' : 'clone'
       const targetX = anim.commit
@@ -251,7 +254,9 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
         finalizeAnim()
       }
       const state = useReadingStore.getState()
-      const pw = state.pageWidth
+      // 覆盖模式翻页距离 = page 宽 = pageStride（= pageWidth + pageGap = viewport clientWidth），
+      // 与 startAnim 同步：page 撑满屏幕后，page 滑出/滑入距离必须 = page 宽才能完全离开屏幕。
+      const pw = state.pageStride
       if (pw <= 0) return false
       const current = resolvePageSurface(state.globalPageIndex, state.buffer)
       if (!current) return false
