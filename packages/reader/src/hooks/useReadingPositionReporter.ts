@@ -46,10 +46,13 @@ class ReadingPositionReporter {
   }
 
   buildPosPayload(): ReadingSnapshot | null {
-    const snapshot = computeReadingSnapshotFromDom()
+    // phase-12 perf：横划模式传 coarseHorizontalAnchor，跳过逐字符
+    // getClientRects 扫描（O(当前页之前字符数)，页越靠后越卡）——
+    // 横划 payload 的恢复主键是 cur/totalPage，锚点精确到段首即可。
+    const horizontal = useSettingsStore.getState().horizontalEnabled
+    const snapshot = computeReadingSnapshotFromDom({ coarseHorizontalAnchor: horizontal })
     if (!snapshot?.domPos) return null
 
-    const horizontal = useSettingsStore.getState().horizontalEnabled
     const { chapterId, pageIndex, pageCount } = useReadingStore.getState()
 
     const payloadStr = buildReadPositionPayload({

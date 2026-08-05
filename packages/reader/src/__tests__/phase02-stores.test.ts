@@ -241,7 +241,8 @@ describe('useTouchFlip 常量与 Vue 逐字一致', () => {
   it('DRAG_THRESHOLD = 40', () => {
     expect(DRAG_THRESHOLD).toBe(40)
   })
-  it('AXIS_LOCK_THRESHOLD = 8', () => {
-    expect(AXIS_LOCK_THRESHOLD).toBe(8)
+  // phase-12：8 → 4（覆盖模式微动手势无响应修复，兼顾防误触与跟手）
+  it('AXIS_LOCK_THRESHOLD = 4', () => {
+    expect(AXIS_LOCK_THRESHOLD).toBe(4)
   })
 })

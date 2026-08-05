@@ -243,9 +243,30 @@ interface BookmarkAnchor {
   strIdx: number
 }
 
-function computeBookmarkAnchor(bodyEl: Element, viewportEl: Element | null, horizontal: boolean): BookmarkAnchor {
+function computeBookmarkAnchor(
+  bodyEl: Element,
+  viewportEl: Element | null,
+  horizontal: boolean,
+  coarseHorizontal: boolean = false
+): BookmarkAnchor {
   if (!bodyEl) {
     return { domPos: '0=1=0=0#0', summary: '', strIdx: 0 }
+  }
+
+  // phase-12 perf：横划高频路径（进度上报）跳过逐字符 getClientRects 扫描——
+  // 该扫描成本 O(当前页之前的字符数)，页越靠后越卡；直接落下方段落级锚点。
+  // 横划 payload 的恢复主键是 cur/totalPage（pageIndex/pageCount），
+  // domPos/strIdx 精确到段首已足够；书签创建等低频路径保持逐字符精确扫描。
+  if (coarseHorizontal && horizontal) {
+    const visible = resolveVisibleContent(bodyEl, viewportEl, horizontal) as VisibleContent
+    const index = visible.index
+    let coarseStrIdx = 0
+    getParagraphElements(bodyEl)
+      .slice(0, index)
+      .forEach(paragraph => {
+        coarseStrIdx += (paragraph.textContent || '').length
+      })
+    return { domPos: `0=1=${index}=0#0`, summary: visible.text, strIdx: coarseStrIdx }
   }
 
   const viewportRect = (viewportEl || bodyEl).getBoundingClientRect()
@@ -325,6 +346,8 @@ export interface BuildReadingSnapshotInput {
   horizontal: boolean
   pageIndex: number
   pageCount: number
+  /** phase-12 perf：横划模式跳过逐字符扫描，锚点精确到段首（见 computeBookmarkAnchor） */
+  coarseHorizontalAnchor?: boolean
 }
 
 /**
@@ -338,13 +361,14 @@ export function buildReadingSnapshot({
   viewportEl,
   horizontal,
   pageIndex,
-  pageCount
+  pageCount,
+  coarseHorizontalAnchor = false
 }: BuildReadingSnapshotInput): ReadingSnapshot {
   if (!bodyEl) {
     return { domPos: '0=1=0=0#0', summary: '', precent: 0, strIdx: 0 }
   }
 
-  const anchor = computeBookmarkAnchor(bodyEl, viewportEl || rootEl, horizontal)
+  const anchor = computeBookmarkAnchor(bodyEl, viewportEl || rootEl, horizontal, coarseHorizontalAnchor)
   const precent = resolveChapterPrecent({ horizontal, pageIndex, pageCount, rootEl })
 
   return {

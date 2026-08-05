@@ -10,9 +10,12 @@
  * rootRef 命令式独占写入（拖拽跟手 rAF 直写 + 弹簧动画）；本组件只保留
  * z 序/阴影 class/CSS 变量/切片位移等结构属性。
  *
+ * phase-12 perf: React.memo 包裹，避免 PagedReader 低频结构渲染时
+ * 两个 PageSurfaceView 的无谓 re-render（props 多为原始值/稳定引用，diff 成本低）。
+ *
  * 下期仿真翻页（page-flip）以本组件作为页级渲染接入点。
  */
-import type { CSSProperties, ReactNode, RefObject } from 'react'
+import { memo, type CSSProperties, type ReactNode, type RefObject } from 'react'
 
 export interface PageSurfaceViewProps {
   /** 层叠顺序：底层静止页 1 / 顶层移动页 2（resolveCoverLayers 的 z 序约定） */
@@ -34,7 +37,7 @@ export interface PageSurfaceViewProps {
   children?: ReactNode
 }
 
-export function PageSurfaceView(props: PageSurfaceViewProps): ReactNode {
+export const PageSurfaceView = memo(function PageSurfaceView(props: PageSurfaceViewProps): ReactNode {
   const {
     zIndex,
     moving,
@@ -69,4 +72,4 @@ export function PageSurfaceView(props: PageSurfaceViewProps): ReactNode {
       </div>
     </div>
   )
-}
+})

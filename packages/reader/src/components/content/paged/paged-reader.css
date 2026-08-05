@@ -29,6 +29,10 @@
 .paged-reader__hidden-flow {
   height: 100%;
   overflow: hidden;
+  /* phase-12 perf: skip layout for off-screen hidden measurement flows,
+     reducing forced reflow on chapter transitions. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px 100%;
 }
 
 /* 页容器：页尺寸 overflow:hidden 盒，分层堆叠（z-index 由组件内联）。 */

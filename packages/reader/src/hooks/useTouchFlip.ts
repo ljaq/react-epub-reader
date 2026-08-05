@@ -18,7 +18,7 @@
  * - fling 判定（resolveDragTurnWithFling）：快甩无视 40px 位置阈值直接翻页；
  * - 松手速度写 store.dragReleaseVelocity，由运动桥接消费为弹簧初速度。
  */
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, startTransition } from 'react'
 import {
   applyGlobalDragResistance,
   resolveDragTurnWithFling,
@@ -28,7 +28,8 @@ import { useReadingStore } from '../store/reading-store'
 import { useUiStore } from '../store/ui-store'
 
 export const DRAG_THRESHOLD = 40
-export const AXIS_LOCK_THRESHOLD = 8
+/** 轴锁定阈值（px）：覆盖模式下过高的阈值会导致微动手势无响应；4px 兼顾防误触与跟手 */
+export const AXIS_LOCK_THRESHOLD = 4
 
 /** 速度采样窗口（ms）：只取松手前最近一段位移估算瞬时速度 */
 export const VELOCITY_SAMPLE_WINDOW_MS = 100
@@ -163,8 +164,14 @@ export function useTouchFlip(input: UseTouchFlipInput): {
     if (handled) {
       return
     }
-    if (action === 'next-page') turnPage(1)
-    else if (action === 'prev-page') turnPage(-1)
+    // phase-12 perf: wrap turnPage in startTransition so React re-render is
+    // low-priority/interruptible. This lets the motion bridge's rAF callback
+    // (triggered by setDragOffset below) interleave with React rendering instead
+    // of being blocked by it.
+    startTransition(() => {
+      if (action === 'next-page') turnPage(1)
+      else if (action === 'prev-page') turnPage(-1)
+    })
     setDragOffset(0)
     // 翻页阴影复位兜底：正常路径由弹簧 onComplete 驱动（运动桥接）；
     // 抑制期直写/异常路径由本定时器兜底（弹簧硬超时 600ms + 余量）

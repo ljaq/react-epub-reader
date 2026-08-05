@@ -63,7 +63,12 @@ export function useBookmarkActions(options: BookmarkActionsOptions) {
   }, [options])
 
   const getCurrentBookmark = useCallback(() => {
-    const snapshot = computeReadingSnapshotFromDom()
+    // phase-12 perf：横划模式下 findBookmarkAtSnapshot 仅按 pageIndex 匹配书签，
+    // 完全不消费 snapshot；此处与 ReaderContent 书签角标同理跳过
+    // computeReadingSnapshotFromDom()——其逐字符 Range.getClientRects 扫描成本
+    // O(当前页之前的字符数)，TopBar 每次翻页渲染同步执行会阻塞主线程，
+    // 表现为松手后卡顿一段、越靠章节末尾越卡。竖滚保留原行为。
+    const snapshot = options.horizontalEnabled ? null : computeReadingSnapshotFromDom()
     return findBookmarkAtSnapshot(options.chapterBookmarks, snapshot, {
       horizontal: options.horizontalEnabled,
       pageCount: options.pageCount,

@@ -27,6 +27,7 @@
  *   弹簧启停（animState，每次翻页 2-3 次 render）。
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { unstable_batchedUpdates } from 'react-dom'
 import type { RefObject } from 'react'
 import type { ChapterContent, ChapterMeta } from '../../../types'
 import type { SelectionBridgeHandle } from '../../overlays/selection/SelectionLayer'
@@ -153,28 +154,33 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
     if (!anim) return
     animStateRef.current = null
     const state = useReadingStore.getState()
-    setDragSession(null)
-    if (anim.commit) {
-      // 两阶段转正：先提交页码（新章/新页规范流挂载），克隆层留顶遮盖，
-      // 由 settlingClone effect 在 marks ready 后撤下
-      state.setGlobalPageIndex(state.globalPageIndex + anim.direction)
-      setSettlingClone(true)
-      setAnimState(null)
-      state.setDragOffset(0)
-      state.setFlipAnimating(false)
-      state.setFlipping(false)
-      // 动画期缓冲锁解除后补跑 ensureBuffer（±1 章窗口滑动）
-      scheduleBufferRebalance()
-    } else {
-      setAnimState(null)
-      clearClone()
-      state.setDragOffset(0)
-      state.setFlipAnimating(false)
-      state.setFlipping(false)
-      if (useReadingStore.getState().buffer.silentExpand) {
+    // phase-12 perf: batch React state updates inside unstable_batchedUpdates
+    // to avoid 3 separate renders when called from spring onComplete (rAF).
+    // Preserve original order: React state first, then zustand actions.
+    unstable_batchedUpdates(() => {
+      setDragSession(null)
+      if (anim.commit) {
+        // 两阶段转正：先提交页码（新章/新页规范流挂载），克隆层留顶遮盖，
+        // 由 settlingClone effect 在 marks ready 后撤下
+        state.setGlobalPageIndex(state.globalPageIndex + anim.direction)
+        setSettlingClone(true)
+        setAnimState(null)
+        state.setDragOffset(0)
+        state.setFlipAnimating(false)
+        state.setFlipping(false)
+        // 动画期缓冲锁解除后补跑 ensureBuffer（±1 章窗口滑动）
         scheduleBufferRebalance()
+      } else {
+        setAnimState(null)
+        clearClone()
+        state.setDragOffset(0)
+        state.setFlipAnimating(false)
+        state.setFlipping(false)
+        if (useReadingStore.getState().buffer.silentExpand) {
+          scheduleBufferRebalance()
+        }
       }
-    }
+    })
   }, [clearClone])
 
   // 拖拽会话变化（桥接回调）：克隆挂载/销毁 + 打断转正遮盖收尾

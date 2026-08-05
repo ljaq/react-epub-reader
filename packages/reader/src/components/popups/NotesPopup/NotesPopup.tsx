@@ -170,8 +170,6 @@ export function NotesPopup(props: NotesPopupProps): React.ReactNode {
   const chapterTitle =
     chapterList.find((c) => Number(c.id) === Number(chapterId))?.chapterName || ''
 
-  const currentSnapshot = computeReadingSnapshotFromDom()
-
   useEffect(() => {
     if (!visible) {
       setActionSheet({ visible: false, type: '', item: null })
@@ -179,6 +177,13 @@ export function NotesPopup(props: NotesPopupProps): React.ReactNode {
   }, [visible])
 
   if (!visible) return null
+
+  // phase-12 perf：快照计算移到 visible 早退之后——本组件订阅 pageIndex，
+  // 每次翻页都重渲染，原实现即使弹窗关闭也同步执行
+  // computeReadingSnapshotFromDom()（逐字符 Range.getClientRects 扫描，
+  // 成本 O(当前页之前的字符数)），是平移模式松手后卡顿、越靠章节末尾越卡的
+  // 根因之一。横划模式 findBookmarkAtSnapshot 仅按 pageIndex 匹配，传 null。
+  const currentSnapshot = horizontalEnabled ? null : computeReadingSnapshotFromDom()
 
   const handleClose = () => closePopup('notes')
 

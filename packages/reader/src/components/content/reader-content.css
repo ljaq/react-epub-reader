@@ -62,6 +62,10 @@
   height: 100%;
   overflow: hidden;
   position: relative;
+  /* phase-12 perf: defer layout for off-screen segments during chapter switches,
+     reducing forced reflow on large HTML injection (dangerouslySetInnerHTML). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px 100%;
 }
 
 /* 翻页阴影（平移模式 slide 专用）：每页右侧内边缘渐变阴影（对照 novel-reader inset -4px 0 12px），

@@ -21,7 +21,7 @@ import {
 
 const para = (text: string): string => `<p>${text}</p>`
 
-const longBody = Array.from({ length: 24 }, (_, i) =>
+const longBody = Array.from({ length: 48 }, (_, i) =>
   para(
     `第 ${i + 1} 段：这是 react-epub-reader Phase 8 Mock API 预览文本。横划模式下正文会被 CSS 多列布局切成多页。`
   )

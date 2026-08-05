@@ -237,7 +237,12 @@ export function ReaderContent(props: ReaderContentProps): React.ReactNode {
   }, [horizontalEnabled, chapterId, syncVerticalChapterEnd])
 
   const chapterBookmarks = getMergedChapterBookmarks(chapterId, bookmarks)
-  const snapshot = computeReadingSnapshotFromDom()
+  // phase-12 perf: 横划模式下 findBookmarkAtSnapshot 仅按 pageIndex 匹配书签，
+  // 完全不消费 snapshot；原实现每次翻页都在渲染期同步执行
+  // computeReadingSnapshotFromDom()——逐字符 Range.getClientRects 扫描，
+  // 成本 O(当前页之前的字符数)，真机深页单次阻塞主线程数百毫秒，
+  // 表现为松手后弹簧动画延迟启动、越靠章节末尾越卡。竖滚保留原行为。
+  const snapshot = horizontalEnabled ? null : computeReadingSnapshotFromDom()
   const currentBookmark = findBookmarkAtSnapshot(chapterBookmarks, snapshot, {
     horizontal: horizontalEnabled,
     pageCount,
