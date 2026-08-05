@@ -68,33 +68,27 @@
   contain-intrinsic-size: auto 300px 100%;
 }
 
-/* 翻页阴影（平移模式 slide 专用）：每页右侧内边缘渐变阴影（对照 novel-reader inset -4px 0 12px），
-   跟着 segment（track）滚动，充满整页高度。
-   阴影在 pageWidth 前 8px 向左渐变，确保最后一页（segment 右边缘）阴影也在内可见。
-   仅 is-flipping（拖拽 + 翻页动画）时显示，不翻页时无阴影。
-   phase-10 覆盖模式（cover）不使用本阴影：其移动页分界缘单条渐变阴影见
-   paged/paged-reader.css 的 .paged-reader__page--moving::after。 */
-.reader-content__segment::after {
+/* phase-13 翻页阴影（平移模式 slide 专用）：弱外阴影，每页右缘投射到下一页左缘。
+   ::after 锚在 body（列容器）上，与 CSS 多列 column 边界天然对齐。
+   background-position 控制整体右移量。仅翻页中（.is-flipping）显示。 */
+.reader-content__segment.is-flipping .reader-content__body--columns::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.18s ease-out;
-  background: repeating-linear-gradient(
+  opacity: 1;
+  background-image: repeating-linear-gradient(
     to right,
     transparent 0,
-    transparent calc(var(--page-width, 0px) - 8px),
-    rgba(0, 0, 0, 0) calc(var(--page-width, 0px) - 8px),
-    rgba(0, 0, 0, 0.05) calc(var(--page-width, 0px) - 1px),
-    rgba(0, 0, 0, 0) var(--page-width, 0px),
+    transparent var(--page-width, 0px),
+    rgba(0, 0, 0, 0.08) var(--page-width, 0px),
+    rgba(0, 0, 0, 0.02) calc(var(--page-width, 0px) + 6px),
+    rgba(0, 0, 0, 0) calc(var(--page-width, 0px) + 12px),
     transparent var(--page-stride, 0px)
   );
-}
-
-.reader-content__segment.is-flipping::after {
-  opacity: 1;
+  background-position: 16px 0;
+  background-repeat: repeat;
 }
 
 .reader-content__viewport-v {
