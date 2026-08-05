@@ -8,6 +8,10 @@
  *
  * 提交/回弹判定复用 core/pagination 的 resolveGlobalDragTurn（阈值 DRAG_THRESHOLD=40），
  * 与平移模式手感一致，不发明新阈值。
+ *
+ * phase-13 视差翻页：
+ * - 右滑时上一页从最左侧（-pageWidth）开始，不再前缘锚定手指。
+ * - 底层页做 1/4 速度视差位移 + 黑色半透明遮罩渐隐。
  */
 import {
   resolveGlobalDragTurn,
@@ -47,12 +51,13 @@ export interface CoverTranslateInput {
 /**
  * 移动页位移映射：
  * - next + 有相邻页：当前页向左滑出，translateX = clamp(dragOffset, -pageWidth, 0)。
- * - prev + 有相邻页：上一页前缘（右缘）锚定手指 clientX = dragStartX + dragOffset，
- *   translateX = clamp(-pageWidth + clientX, -pageWidth, 0)——手指在哪页面前缘就在哪。
+ * - prev + 有相邻页：上一页从最左侧 -pageWidth 开始、跟随手指向右滑入，
+ *   translateX = clamp(-pageWidth + dragOffset, -pageWidth, 0)。
  * - 无相邻页（首末页阻尼）：当前页整体跟随阻尼位移，translateX = dragOffset。
  */
 export function getCoverMovingTranslateX(input: CoverTranslateInput): number {
-  const { direction, dragOffset, pageWidth, hasAdjacent, dragStartX = 0 } = input
+  const { direction, dragOffset, pageWidth, hasAdjacent, dragStartX: _dragStartX } = input
+  void _dragStartX // 保留字段兼容，phase-13 起 prev 分支不再使用前缘锚定
   if (pageWidth <= 0) {
     return 0
   }
@@ -62,7 +67,38 @@ export function getCoverMovingTranslateX(input: CoverTranslateInput): number {
   if (direction > 0) {
     return Math.max(-pageWidth, Math.min(0, dragOffset))
   }
-  return Math.min(0, Math.max(-pageWidth, -pageWidth + Math.max(0, dragStartX + dragOffset)))
+  return Math.min(0, Math.max(-pageWidth, -pageWidth + Math.max(0, dragOffset)))
+}
+
+/**
+ * 视差模式下静态页位移：底层速度为顶层的 1/4。
+ * 公式：staticX = pageWidth/4 + movingX/4
+ *
+ * - 左滑（movingX 0→-pageWidth）：静态页从右侧 pageWidth/4 滑入到 0。
+ * - 右滑（movingX -pageWidth→0）：静态页从 0 滑出到 pageWidth/4。
+ */
+export function getCoverStaticParallaxX(movingX: number, pageWidth: number): number {
+  return pageWidth / 4 + movingX / 4
+}
+
+/**
+ * 静态页黑色半透明遮罩透明度：
+ * - 左滑（下一页从底层显露）：1（全黑）→ 0（完全透明），强光渐隐
+ * - 右滑（上一页从左侧逼近）：0（完全透明）→ 1（全黑），阴影渐强
+ *
+ * @param movingX 顶层移动页的 translateX
+ * @param pageWidth 页宽
+ * @param direction 翻页方向（1=左滑，-1=右滑）
+ */
+export function getCoverOverlayOpacity(movingX: number, pageWidth: number, direction: CoverDirection): number {
+  if (pageWidth <= 0) return 0
+  const fraction =
+    direction > 0
+      ? Math.abs(movingX) / pageWidth // 左滑：movingX 为负，进度 = |movingX|/pageWidth
+      : (movingX + pageWidth) / pageWidth // 右滑：movingX = -pageWidth→0，进度 = (movingX+pw)/pw
+  const clamped = Math.max(0, Math.min(1, fraction))
+  // 左滑：下一页显露，遮罩渐隐（1→0）；右滑：上一页逼近，遮罩渐强（0→1）
+  return direction > 0 ? 1 - clamped : clamped
 }
 
 /** 动画提交终点：next → 当前页滑出到 -pageWidth；prev → 上一页滑入到 0。 */

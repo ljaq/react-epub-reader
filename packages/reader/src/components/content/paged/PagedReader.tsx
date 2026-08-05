@@ -235,7 +235,8 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
         fromX: anim.fromX,
         targetX,
         velocity,
-        onComplete: finalizeAnim
+        onComplete: finalizeAnim,
+        direction: anim.direction
       })
     },
     [showClone, finalizeAnim]

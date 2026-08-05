@@ -1,9 +1,11 @@
 /**
- * core/flip 覆盖动画纯函数单测（phase-10）。
+ * core/flip 覆盖动画纯函数单测（phase-10, phase-13）。
  *
  * 覆盖：
  * - getCoverMovingTranslateX：next/prev/阻尼三分支的位移映射与 clamp
  * - getCoverCommitTargetX / getCoverRestingX：动画终点
+ * - getCoverStaticParallaxX：视差静态页位移
+ * - getCoverOverlayOpacity：静态页遮罩透明度
  * - resolveCoverLayers：动/静页层级分配（含首末页阻尼 staticPage=null）
  * - resolveCoverDragTurn：提交/回弹判定（复用全局阈值语义）
  */
@@ -11,7 +13,9 @@ import { describe, it, expect } from 'vitest'
 import {
   getCoverCommitTargetX,
   getCoverMovingTranslateX,
+  getCoverOverlayOpacity,
   getCoverRestingX,
+  getCoverStaticParallaxX,
   resolveCoverDragTurn,
   resolveCoverLayers
 } from '../flip'
@@ -73,20 +77,20 @@ describe('getCoverMovingTranslateX', () => {
     ).toBe(0)
   })
 
-  it('prev + dragStartX（掌阅锚定）：前缘从手指位置出现并跟随 clientX', () => {
-    // 手指在 300 处按下，右滑 30：前缘 = 330，translateX = -pageWidth + 330
+  it('prev：上一页从最左侧开始，跟随 dragOffset 向右滑入（phase-13 不再锚定手指）', () => {
+    // 右滑 30：移动 30，translateX = -pageWidth + 30
     expect(
       getCoverMovingTranslateX({ direction: -1, dragOffset: 30, pageWidth: PAGE_WIDTH, hasAdjacent: true, dragStartX: 300 })
-    ).toBe(-PAGE_WIDTH + 330)
-    // 刚按下未移动（dx=0）：前缘即在按下点 300
+    ).toBe(-PAGE_WIDTH + 30)
+    // 刚按下未移动（dx=0）：仍在最左侧 -pageWidth（不再从手指位置出现）
     expect(
       getCoverMovingTranslateX({ direction: -1, dragOffset: 0, pageWidth: PAGE_WIDTH, hasAdjacent: true, dragStartX: 300 })
-    ).toBe(-PAGE_WIDTH + 300)
+    ).toBe(-PAGE_WIDTH)
     // 手指滑到屏幕右缘：完全盖住（clamp 0）
     expect(
-      getCoverMovingTranslateX({ direction: -1, dragOffset: 80, pageWidth: PAGE_WIDTH, hasAdjacent: true, dragStartX: 300 })
+      getCoverMovingTranslateX({ direction: -1, dragOffset: PAGE_WIDTH, pageWidth: PAGE_WIDTH, hasAdjacent: true, dragStartX: 300 })
     ).toBe(0)
-    // 手指回拉到 0 左界外：藏回左侧（clamp -pageWidth）
+    // 手指回拉：藏回左侧（clamp -pageWidth）
     expect(
       getCoverMovingTranslateX({ direction: -1, dragOffset: -400, pageWidth: PAGE_WIDTH, hasAdjacent: true, dragStartX: 300 })
     ).toBe(-PAGE_WIDTH)
@@ -189,5 +193,42 @@ describe('resolveCoverDragTurn 提交/回弹判定', () => {
   it('首末页边界不越界提交', () => {
     expect(resolveCoverDragTurn(0, 5, 120)).toBe('stay')
     expect(resolveCoverDragTurn(4, 5, -120)).toBe('stay')
+  })
+})
+
+describe('getCoverStaticParallaxX 视差静态页位移', () => {
+  it('左滑：底层下一页从 pageWidth/4 滑入到 0', () => {
+    expect(getCoverStaticParallaxX(0, PAGE_WIDTH)).toBe(PAGE_WIDTH / 4)
+    expect(getCoverStaticParallaxX(-PAGE_WIDTH / 2, PAGE_WIDTH)).toBe(PAGE_WIDTH / 8)
+    expect(getCoverStaticParallaxX(-PAGE_WIDTH, PAGE_WIDTH)).toBe(0)
+  })
+
+  it('右滑：底层当前页从 0 滑出到 pageWidth/4', () => {
+    expect(getCoverStaticParallaxX(-PAGE_WIDTH, PAGE_WIDTH)).toBe(0)
+    expect(getCoverStaticParallaxX(-PAGE_WIDTH / 2, PAGE_WIDTH)).toBe(PAGE_WIDTH / 8)
+    expect(getCoverStaticParallaxX(0, PAGE_WIDTH)).toBe(PAGE_WIDTH / 4)
+  })
+})
+
+describe('getCoverOverlayOpacity 遮罩透明度', () => {
+  it('左滑：遮罩从 1 渐隐到 0', () => {
+    expect(getCoverOverlayOpacity(0, PAGE_WIDTH, 1)).toBe(1)
+    expect(getCoverOverlayOpacity(-PAGE_WIDTH / 2, PAGE_WIDTH, 1)).toBe(0.5)
+    expect(getCoverOverlayOpacity(-PAGE_WIDTH, PAGE_WIDTH, 1)).toBe(0)
+  })
+
+  it('右滑：上一页逼近，遮罩从 0 渐强到 1', () => {
+    expect(getCoverOverlayOpacity(-PAGE_WIDTH, PAGE_WIDTH, -1)).toBe(0)
+    expect(getCoverOverlayOpacity(-PAGE_WIDTH / 2, PAGE_WIDTH, -1)).toBe(0.5)
+    expect(getCoverOverlayOpacity(0, PAGE_WIDTH, -1)).toBe(1)
+  })
+
+  it('clamp 到 [0, 1]', () => {
+    expect(getCoverOverlayOpacity(-999, PAGE_WIDTH, 1)).toBe(0)
+    expect(getCoverOverlayOpacity(999, PAGE_WIDTH, -1)).toBe(1)
+  })
+
+  it('pageWidth ≤ 0 → 0', () => {
+    expect(getCoverOverlayOpacity(-100, 0, 1)).toBe(0)
   })
 })

@@ -70,6 +70,8 @@ export const PageSurfaceView = memo(function PageSurfaceView(props: PageSurfaceV
       <div className="paged-reader__slice" style={sliceStyle} ref={cloneHostRef}>
         {children}
       </div>
+      {/* phase-13 视差翻页：静态页黑色半透明遮罩，opacity 由 --cover-overlay 控制 */}
+      <div className="paged-reader__page-overlay" />
     </div>
   )
 })

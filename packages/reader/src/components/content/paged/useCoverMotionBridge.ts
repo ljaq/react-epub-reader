@@ -13,10 +13,16 @@
  * - 弹簧落幕同步归位：onComplete 内 PagedReader 已同步完成结构重排（提交转正），
  *   桥接立即把双页写回静止位，避免新规范流继承弹簧末位一帧；
  * - 单写者原则：两个页容器的 transform 由本桥接独占，JSX 不再设置。
+ *
+ * phase-13 视差翻页：
+ * - 底层静态页以 1/4 速度跟随顶层移动页做视差位移；
+ * - 底层静态页挂载黑色半透明遮罩（CSS 变量 --cover-overlay），滑动过程中渐隐。
  */
 import { useEffect, useRef, type RefObject } from 'react'
 import {
   getCoverMovingTranslateX,
+  getCoverStaticParallaxX,
+  getCoverOverlayOpacity,
   type CoverDirection
 } from '../../../core/flip'
 import { createSpringAnimation, type SpringAnimation } from '../../../core/motion'
@@ -56,6 +62,8 @@ export interface PlaySpringInput {
   /** 初速度 px/ms（内部 clamp 到 ±MAX_SPRING_VELOCITY） */
   velocity?: number
   onComplete: () => void
+  /** phase-13 视差翻页方向，用于计算底层静态页位移 + 遮罩渐隐 */
+  direction?: CoverDirection
 }
 
 export interface CoverMotionBridge {
@@ -81,13 +89,32 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
     clone: null
   })
 
-  /** 命令式写入指定页容器位移（幂等：同值跳过） */
+  /** 命令式写入指定页容器位移（幂等：同值跳过）。
+   *  注意：el 不存在时清掉 lastXRef，避免 clone 挂载后被幂等优化跳过首次写入。 */
   const writeTo = (which: 'current' | 'clone', x: number): void => {
+    const el = which === 'current' ? currentRootRef.current : cloneRootRef.current
+    if (!el) {
+      lastXRef.current[which] = null
+      return
+    }
     if (lastXRef.current[which] === x) return
     lastXRef.current[which] = x
+    el.style.transform = `translateX(${x}px)`
+  }
+
+  /** phase-13：写入静态页黑色半透明遮罩透明度（CSS 变量 --cover-overlay） */
+  const writeOverlay = (which: 'current' | 'clone', opacity: number): void => {
     const el = which === 'current' ? currentRootRef.current : cloneRootRef.current
     if (!el) return
-    el.style.transform = `translateX(${x}px)`
+    el.style.setProperty('--cover-overlay', String(opacity))
+  }
+
+  /** phase-13：清除双页遮罩 */
+  const clearOverlays = (): void => {
+    const cur = currentRootRef.current
+    const cln = cloneRootRef.current
+    if (cur) cur.style.removeProperty('--cover-overlay')
+    if (cln) cln.style.removeProperty('--cover-overlay')
   }
 
   const cancelSpring = (): void => {
@@ -108,6 +135,8 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
           // 无过渡落定：当前页立即归静止位（对齐旧 finalize 后 render 的 0 位移），
           // 避免提交转正后的新规范流继承弹簧末位一帧
           writeTo('current', 0)
+          // 注意：此处不调 clearOverlays()——下一帧拖拽路径会立即写回遮罩值，
+          // 先清再写会导致遮罩 0→≈1 的闪黑，保留弹簧末态的遮罩值平滑过渡。
           // 会话状态已被 finalizeAnim 清空，重置 key 使后续跟手重新通知
           sessionKeyRef.current = null
           callbacksRef.current.onSpringSettleInterrupted()
@@ -115,7 +144,7 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
         return
       }
 
-      // 拖拽跟手：每帧直写移动页位移；会话变化才回调（低频结构渲染）
+      // 拖拽跟手：每帧直写移动页位移 + 静态页视差 + 遮罩；会话变化才回调（低频结构渲染）
       if (s.dragOffset !== 0) {
         const current = resolvePageSurface(s.globalPageIndex, s.buffer)
         if (!current || s.pageWidth <= 0) return
@@ -134,18 +163,33 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
           dragStartX: s.dragStartX
         })
         const currentIsMoving = direction === 1 || adjacent === null
-        writeTo(currentIsMoving ? 'current' : 'clone', movingX)
-        writeTo(currentIsMoving ? 'clone' : 'current', 0)
+        const movingWhich: 'current' | 'clone' = currentIsMoving ? 'current' : 'clone'
+        const staticWhich: 'current' | 'clone' = currentIsMoving ? 'clone' : 'current'
+
+        writeTo(movingWhich, movingX)
+
+        // phase-13 视差翻页：静态页 1/4 速度位移 + 黑色半透明遮罩渐隐
+        if (adjacent !== null) {
+          const pw = s.pageWidth
+          const staticX = getCoverStaticParallaxX(movingX, pw)
+          const overlay = getCoverOverlayOpacity(movingX, pw, direction)
+          writeTo(staticWhich, staticX)
+          writeOverlay(staticWhich, overlay)
+        } else {
+          writeTo(staticWhich, 0)
+          writeOverlay(staticWhich, 0)
+        }
         return
       }
 
-      // 空闲：会话收尾 + 双页归位（静止态恒 0）
+      // 空闲：会话收尾 + 双页归位 + 清除遮罩（静止态恒 0）
       if (sessionKeyRef.current !== null) {
         sessionKeyRef.current = null
         callbacksRef.current.onDragSessionChange(null)
       }
       writeTo('current', 0)
       writeTo('clone', 0)
+      clearOverlays()
     }
 
     const schedule = (): void => batcher.schedule(applyFrame)
@@ -175,15 +219,38 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
   }, [])
 
   return {
-    playSpring: ({ which, fromX, targetX, velocity = 0, onComplete }) => {
+    playSpring: ({ which, fromX, targetX, velocity = 0, onComplete, direction }) => {
       cancelSpring()
       writeTo(which, fromX)
       const v = Math.max(-MAX_SPRING_VELOCITY, Math.min(MAX_SPRING_VELOCITY, velocity))
+      const staticWhich: 'current' | 'clone' = which === 'current' ? 'clone' : 'current'
+
+      // phase-13 视差：弹簧起始帧也写静态页 + 遮罩
+      if (direction !== undefined) {
+        const s = useReadingStore.getState()
+        if (s.pageWidth > 0) {
+          const initStaticX = getCoverStaticParallaxX(fromX, s.pageWidth)
+          const initOverlay = getCoverOverlayOpacity(fromX, s.pageWidth, direction)
+          writeTo(staticWhich, initStaticX)
+          writeOverlay(staticWhich, initOverlay)
+        }
+      }
+
       springRef.current = createSpringAnimation({
         from: fromX,
         to: targetX,
         velocity: v,
-        onUpdate: (x) => writeTo(which, x),
+        onUpdate: (x) => {
+          writeTo(which, x)
+          // phase-13 视差：弹簧每帧同步更新静态页
+          if (direction !== undefined) {
+            const s = useReadingStore.getState()
+            if (s.pageWidth > 0) {
+              writeTo(staticWhich, getCoverStaticParallaxX(x, s.pageWidth))
+              writeOverlay(staticWhich, getCoverOverlayOpacity(x, s.pageWidth, direction))
+            }
+          }
+        },
         onComplete: () => {
           springRef.current = null
           onComplete()
@@ -193,6 +260,7 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
           if (!s.flipAnimating && s.dragOffset === 0) {
             writeTo('current', 0)
             writeTo('clone', 0)
+            clearOverlays()
           }
         }
       })

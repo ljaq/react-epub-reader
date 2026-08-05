@@ -64,3 +64,15 @@
 .paged-reader__page--moving {
   box-shadow: 8px 0 14px -6px rgba(0, 0, 0, 0.35);
 }
+
+/* phase-13 视差翻页：静态页黑色半透明遮罩，滑动过程中逐渐消失。
+   opacity 由运动桥接 via --cover-overlay 命令式写入，拖拽/弹簧期间零 re-render。 */
+.paged-reader__page-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 1;
+  opacity: var(--cover-overlay, 0);
+  will-change: opacity;
+}
