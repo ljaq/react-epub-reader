@@ -64,10 +64,12 @@
   position: relative;
 }
 
-/* 翻页阴影：每页右侧内边缘渐变阴影（对照 novel-reader inset -4px 0 12px），
+/* 翻页阴影（平移模式 slide 专用）：每页右侧内边缘渐变阴影（对照 novel-reader inset -4px 0 12px），
    跟着 segment（track）滚动，充满整页高度。
    阴影在 pageWidth 前 8px 向左渐变，确保最后一页（segment 右边缘）阴影也在内可见。
-   仅 is-flipping（拖拽 + 翻页动画）时显示，不翻页时无阴影。 */
+   仅 is-flipping（拖拽 + 翻页动画）时显示，不翻页时无阴影。
+   phase-10 覆盖模式（cover）不使用本阴影：其移动页分界缘单条渐变阴影见
+   paged/paged-reader.css 的 .paged-reader__page--moving::after。 */
 .reader-content__segment::after {
   content: '';
   position: absolute;

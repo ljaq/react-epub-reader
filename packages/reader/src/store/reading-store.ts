@@ -47,10 +47,17 @@ interface ReadingState {
   // ── 高频翻页/拖拽（独立 slice 核心） ──
   globalPageIndex: number
   dragOffset: number
+  /** 当前横向拖拽起点 clientX（pointerdown 记录，endDrag 复位 0）；覆盖模式右滑前缘锚定手指用 */
+  dragStartX: number
   isRebalancing: boolean
   layoutLocked: boolean
   /** 拖拽 + 翻页动画期间为 true，用于翻页阴影显隐 */
   isFlipping: boolean
+  /**
+   * 覆盖模式补间动画进行中（phase-10）：此期间禁止 rebalance/silentExpand
+   * 滑动 buffer 窗口，防止克隆源/规范流在动画中途被替换穿帮；动画结束补跑 ensureBuffer。
+   */
+  flipAnimating: boolean
 
   // ── 分页测量 ──
   pageWidth: number
@@ -79,9 +86,11 @@ interface ReadingState {
   setPageCount: (count: number) => void
   setGlobalPageIndex: (index: number) => void
   setDragOffset: (offset: number) => void
+  setDragStartX: (x: number) => void
   setRebalancing: (value: boolean) => void
   setLayoutLocked: (value: boolean) => void
   setFlipping: (value: boolean) => void
+  setFlipAnimating: (value: boolean) => void
   setPageGeometry: (geo: { pageWidth: number; pageGap: number; pageStride: number }) => void
   setMeasuredContentWidth: (width: number) => void
   setBuffer: (buffer: ChapterBuffer) => void
@@ -120,9 +129,11 @@ export const useReadingStore = create<ReadingState>((set) => ({
 
   globalPageIndex: 0,
   dragOffset: 0,
+  dragStartX: 0,
   isRebalancing: false,
   layoutLocked: false,
   isFlipping: false,
+  flipAnimating: false,
 
   pageWidth: 0,
   pageGap: PAGE_COLUMN_GAP,
@@ -168,9 +179,11 @@ export const useReadingStore = create<ReadingState>((set) => ({
     }),
 
   setDragOffset: (offset) => set({ dragOffset: offset }),
+  setDragStartX: (x) => set({ dragStartX: Math.max(0, Number(x) || 0) }),
   setRebalancing: (value) => set({ isRebalancing: value }),
   setLayoutLocked: (value) => set({ layoutLocked: value }),
   setFlipping: (value) => set({ isFlipping: value }),
+  setFlipAnimating: (value) => set({ flipAnimating: value }),
 
   setPageGeometry: ({ pageWidth, pageGap, pageStride }) =>
     set({ pageWidth, pageGap, pageStride }),

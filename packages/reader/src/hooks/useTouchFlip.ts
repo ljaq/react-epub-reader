@@ -16,7 +16,8 @@
 import { useCallback, useRef } from 'react'
 import {
   applyGlobalDragResistance,
-  resolveGlobalDragTurn
+  resolveGlobalDragTurn,
+  type DragTurnResult
 } from '../core/pagination'
 import { useReadingStore } from '../store/reading-store'
 import { useUiStore } from '../store/ui-store'
@@ -27,6 +28,15 @@ export const AXIS_LOCK_THRESHOLD = 8
 export interface UseTouchFlipInput {
   enabled: boolean
   shouldBlock?: () => boolean
+  /**
+   * 翻页提交/回弹覆写点（phase-10 覆盖模式注入动画提交）。
+   * 拖拽松手判定与点击分区翻页时回调：
+   * - action：'next-page'/'prev-page' 提交；'stay' 仅拖拽未过阈值的回弹场景；
+   * - dragOffset：松手瞬间的原始 dx（点击为 0）。
+   * 返回 true 表示覆写方接管（补间动画 + 页码提交 + dragOffset 复位 + isFlipping 收尾），
+   * 本 hook 不再执行默认的 setGlobalPageIndex/setDragOffset(0)/阴影收尾。
+   */
+  onTurnPage?: (action: DragTurnResult, dragOffset: number) => boolean
 }
 
 export function useTouchFlip(input: UseTouchFlipInput): {
@@ -40,7 +50,12 @@ export function useTouchFlip(input: UseTouchFlipInput): {
 } {
   const { enabled, shouldBlock } = input
 
+  // 覆写点经 ref 透传，保持 endDrag/onClick 引用稳定
+  const onTurnPageRef = useRef(input.onTurnPage)
+  onTurnPageRef.current = input.onTurnPage
+
   const setDragOffset = useReadingStore((s) => s.setDragOffset)
+  const setDragStartX = useReadingStore((s) => s.setDragStartX)
   const setGlobalPageIndex = useReadingStore((s) => s.setGlobalPageIndex)
   const setFlipping = useReadingStore((s) => s.setFlipping)
   const toggleUi = useUiStore((s) => s.toggleUi)
@@ -108,6 +123,13 @@ export function useTouchFlip(input: UseTouchFlipInput): {
     pointerIdRef.current = null
     axisLockRef.current = null
     if (movedRef.current) markRecentlyDragged()
+    // 覆写方（覆盖模式）接管提交/回弹动画与收尾；否则走默认直接切页。
+    // 覆写回调先执行（其 fromX 捕获需读 dragStartX），随后复位手势起点。
+    const handled = onTurnPageRef.current?.(action, lastDxRef.current) ?? false
+    setDragStartX(0)
+    if (handled) {
+      return
+    }
     if (action === 'next-page') turnPage(1)
     else if (action === 'prev-page') turnPage(-1)
     setDragOffset(0)
@@ -118,7 +140,7 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       // 若期间又开始新拖拽，保持 true
       if (!draggingRef.current) setFlipping(false)
     }, 290)
-  }, [turnPage, setDragOffset, markRecentlyDragged, setFlipping])
+  }, [turnPage, setDragOffset, setDragStartX, markRecentlyDragged, setFlipping])
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -139,8 +161,9 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       movedRef.current = false
       draggingRef.current = true
       setDragOffset(0)
+      setDragStartX(e.clientX)
     },
-    [enabled, shouldBlock, setDragOffset]
+    [enabled, shouldBlock, setDragOffset, setDragStartX]
   )
 
   const onPointerMove = useCallback(
@@ -189,11 +212,11 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       if (rect.width <= 0) return
       const ratio = (e.clientX - rect.left) / rect.width
       if (ratio < 0.2) {
-        if (enabled) turnPage(-1)
+        if (enabled && !onTurnPageRef.current?.('prev-page', 0)) turnPage(-1)
         return
       }
       if (ratio > 0.8) {
-        if (enabled) turnPage(1)
+        if (enabled && !onTurnPageRef.current?.('next-page', 0)) turnPage(1)
         return
       }
       toggleUi()

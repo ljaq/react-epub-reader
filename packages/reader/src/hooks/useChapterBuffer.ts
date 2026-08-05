@@ -426,6 +426,14 @@ export function useChapterBuffer(input: UseChapterBufferInput): {
       return
     }
     lastRangeKeyRef.current = rangeKey
+    // 窗口刚滑动（rangeKey 变化）时先把已就绪内容立即 merge（preserveAnchor），
+    // 不等 rebalance 周期——否则跨章提交动画（cover 280ms）窗口内到达的邻居章
+    // 要等一整轮 rebalance 才进 buffer，期间 totalPages 不含其页数，
+    // 首次翻页被误判「无下一页」回弹、第二次才生效（phase-10 短章场景）。
+    // 进行中的 rebalance 测量循环每次读取 live buffer，merge 后下一轮重试即可测到。
+    mergeNeighborContentsIntoBuffer(centerId, state.pageIndex, collectReadyContents(chapters, order), {
+      preserveAnchor: true
+    })
     scheduleBufferRebalance()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapters, chapterList, chapterAccess])

@@ -1,0 +1,62 @@
+/**
+ * 覆盖模式（掌阅级）页式排版样式 — phase-10 新增。
+ *
+ * 与平移模式（reader-content.css 的 track/segment）完全隔离：
+ * - 每页一个独立页容器（.paged-reader__page），绝对定位堆叠在 viewport-h 内；
+ * - 当前页容器持有规范流本体，克隆层承载相邻页快照；
+ * - 阴影为移动页右侧外阴影（box-shadow 投影在页盒外、落在被揭开的静止页上），
+ *   随移动页位移；平移模式的 track repeating-gradient 阴影
+ *   （.reader-content__segment::after）保留不动。
+ */
+
+/* 邻居章隐藏测量流：挂 offscreen 供 usePagination scrollWidth 法测量 + 作为克隆源。
+   除 visibility:hidden 外必须再 translate 移出视口：选区 findBodyFromPoint 等命中检测
+   基于 getBoundingClientRect 包含判断，visibility 不影响 rect——若隐藏流 rect 仍铺满
+   视口，长按会误命中隐藏 body 导致选中失败（平移模式邻居章天然在视口外，语义对齐）。
+   transform 不影响布局尺寸，列测量结果与可见态一致。 */
+.paged-reader__hidden-flows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: translateX(-200%);
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.paged-reader__hidden-flow {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 页容器：页尺寸 overflow:hidden 盒，分层堆叠（z-index 由组件内联）。 */
+.paged-reader__page {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--reader-bg);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* 克隆层整层禁交互：不注册 bodyMap、不参与选区与点击（note badge 一并失效）。 */
+.paged-reader__page--clone {
+  pointer-events: none;
+}
+
+/* 页内容切片：承载规范流/克隆的完整多列排版流，
+   translateX(-localPageIndex × stride) 显示对应页（组件内联，无过渡即时切换）。 */
+.paged-reader__slice {
+  height: 100%;
+  will-change: transform;
+}
+
+/* 移动页右侧外阴影，仅拖拽/补间期间挂 --moving 类。
+   box-shadow 渲染在页盒之外（不受页容器自身 overflow:hidden 裁剪），
+   投影落在被揭开/被盖住的静止页上；负 spread 抑制上下边缘溢光。
+   next：旧页面向左滑出，阴影在其右缘外侧；prev：上一页从左侧滑入，阴影同在其右缘外侧。 */
+.paged-reader__page--moving {
+  box-shadow: 8px 0 14px -6px rgba(0, 0, 0, 0.35);
+}

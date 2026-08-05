@@ -24,7 +24,8 @@ import {
 import { useReadingStore } from '../store/reading-store'
 import {
   registerRebalanceOrchestrator,
-  runEnsureBuffer
+  runEnsureBuffer,
+  scheduleBufferRebalance
 } from './buffer-rebalance-bridge'
 
 export interface UsePaginationInput {
@@ -65,6 +66,7 @@ export function usePagination(input: UsePaginationInput): {
   const repaginateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const measureRetryRef = useRef(0)
   const pendingRepaginateRef = useRef(false)
+  const pendingRebalanceRef = useRef(false)
   const rafRef = useRef<number | null>(null)
   const silentExpandRunningRef = useRef(false)
   const onMeasuredRef = useRef(onMeasured)
@@ -203,6 +205,11 @@ export function usePagination(input: UsePaginationInput): {
       pendingRepaginateRef.current = true
       return
     }
+    // 覆盖动画期间禁止重排（phase-10）：动画结束由 rebalance 收尾补跑
+    if (state.flipAnimating) {
+      pendingRepaginateRef.current = true
+      return
+    }
     if (state.buffer.loading) {
       pendingRepaginateRef.current = true
       return
@@ -242,7 +249,14 @@ export function usePagination(input: UsePaginationInput): {
 
   /** 对齐 Vue rebalanceBuffer：isRebalancing 期间禁用 transition，测量后恢复。 */
   const rebalanceBuffer = useCallback(async (): Promise<void> => {
-    if (!enabled || useReadingStore.getState().isRebalancing) return
+    if (!enabled) return
+    if (useReadingStore.getState().isRebalancing) {
+      // 撞上进行中的 rebalance 不得丢弃（phase-10 短章场景：跨章后邻居章 fetch 完成
+      // 触发的 schedule 撞上本次 rebalance 被丢，导致该章永远 merge 不进 buffer、
+      // totalPages 不含其页数而无法翻页）——排队，本次结束后补跑
+      pendingRebalanceRef.current = true
+      return
+    }
 
     setRebalancing(true)
     setLayoutLocked(true)
@@ -265,6 +279,10 @@ export function usePagination(input: UsePaginationInput): {
       if (pendingRepaginateRef.current) {
         pendingRepaginateRef.current = false
         scheduleRepaginate()
+      }
+      if (pendingRebalanceRef.current) {
+        pendingRebalanceRef.current = false
+        scheduleBufferRebalance()
       }
     }
   }, [
@@ -325,6 +343,8 @@ export function usePagination(input: UsePaginationInput): {
     const unsub = useReadingStore.subscribe((state, prev) => {
       if (!state.buffer.silentExpand || state.isRebalancing) return
       if (state.buffer.loading) return
+      // 覆盖动画期间禁止 silentExpand 滑动窗口（phase-10）：动画结束由 rebalance 收尾清理
+      if (state.flipAnimating) return
       const becameSilent =
         state.buffer.silentExpand && !prev.buffer.silentExpand
       const loadingFinished =

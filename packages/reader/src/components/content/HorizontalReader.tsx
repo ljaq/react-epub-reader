@@ -1,5 +1,8 @@
 /**
- * 横划阅读器 — 多章缓冲池 + 连续 transform track。
+ * 平移模式阅读器（flipMode='slide'）— 多章缓冲池 + 连续 transform track。
+ *
+ * phase-10 语义正名：本组件即「平移」翻页模式（整轨横滑），行为零改动；
+ * 「覆盖」翻页见 paged/PagedReader。
  *
  * 源码对照：old-vue-reader/components/ReaderContent/index.vue 横划分支（template:12-42）。
  *

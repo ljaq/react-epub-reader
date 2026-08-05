@@ -207,6 +207,12 @@
   border-color: #1a1a1a;
 }
 
+/* 仿真翻页置灰占位（phase-10，敬请期待） */
+.settings-panel__segment[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .settings-panel__segment--icon {
   display: flex;
   align-items: center;

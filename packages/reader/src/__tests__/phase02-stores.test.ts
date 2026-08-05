@@ -70,13 +70,14 @@ describe('settings-store 常量', () => {
     expect(STORAGE_KEY).toBe('h5-reader-settings')
   })
 
-  it('DEFAULT_SETTINGS 与 Vue 逐字一致', () => {
+  it('DEFAULT_SETTINGS 与 Vue 逐字一致（phase-10 新增 flipMode）', () => {
     expect(DEFAULT_SETTINGS).toEqual({
       theme: 'white',
       brightness: 100,
       spacing: 'medium',
       fontSize: 22,
       fontWeight: 'light',
+      flipMode: 'cover',
       horizontalEnabled: true,
       eyeCareMode: false
     })

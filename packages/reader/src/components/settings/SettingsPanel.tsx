@@ -1,6 +1,7 @@
 /**
  * 设置面板 — 源码对照 old-vue-reader/components/SettingsPanel/index.vue。
- * 亮度 / 护眼 / 四主题 / 行距 / 翻页方式（横划/竖滚）→ settings-store。
+ * 亮度 / 护眼 / 四主题 / 行距 / 翻页方式 → settings-store。
+ * 翻页方式四档（phase-10）：覆盖 / 平移 / 上下滚动 / 仿真（置灰占位，敬请期待）。
  * 翻页方式切换需中断 TTS（Phase 6 接，此处留 hook 注释）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -8,6 +9,7 @@ import {
   BRIGHTNESS_MAX,
   BRIGHTNESS_MIN,
   THEME_MAP,
+  type FlipMode,
   type SpacingKey,
   type ThemeKey
 } from '../../store/settings-store'
@@ -32,6 +34,14 @@ const SPACING_OPTIONS: { value: SpacingKey; label: string; lines: number }[] = [
   { value: 'tight', label: '紧', lines: 4 },
   { value: 'medium', label: '中', lines: 3 },
   { value: 'loose', label: '松', lines: 2 }
+]
+
+/** 翻页模式四档（phase-10）：覆盖 / 平移 / 上下滚动 / 仿真（置灰占位，敬请期待） */
+const FLIP_MODE_OPTIONS: { value: FlipMode; label: string; disabled?: boolean }[] = [
+  { value: 'cover', label: '覆盖' },
+  { value: 'slide', label: '平移' },
+  { value: 'vertical', label: '上下滚动' },
+  { value: 'simulation', label: '仿真', disabled: true }
 ]
 
 function getClientX(event: MouseEvent | TouchEvent): number | null {
@@ -166,13 +176,14 @@ export function SettingsPanel(): React.ReactNode {
     setSettings({ eyeCareMode: !settings.eyeCareMode })
   }
 
-  const setHorizontalEnabled = (value: boolean) => {
-    if (settings.horizontalEnabled === value) return
+  const setFlipMode = (value: FlipMode) => {
+    if (value === 'simulation') return
+    if (settings.flipMode === value) return
     if (isTtsActivelyPlaying()) {
       window.alert('切换翻页方式将中断语音朗读')
       stopTtsSessionGlobal()
     }
-    setSettings({ horizontalEnabled: value })
+    setSettings({ flipMode: value })
   }
 
   return (
@@ -253,20 +264,18 @@ export function SettingsPanel(): React.ReactNode {
       <div className="settings-panel__row">
         <span className="settings-panel__label">翻页</span>
         <div className="settings-panel__segments">
-          <button
-            type="button"
-            className={`settings-panel__segment${settings.horizontalEnabled ? ' settings-panel__segment--active' : ''}`}
-            onClick={() => setHorizontalEnabled(true)}
-          >
-            覆盖
-          </button>
-          <button
-            type="button"
-            className={`settings-panel__segment${!settings.horizontalEnabled ? ' settings-panel__segment--active' : ''}`}
-            onClick={() => setHorizontalEnabled(false)}
-          >
-            滑动
-          </button>
+          {FLIP_MODE_OPTIONS.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              className={`settings-panel__segment${settings.flipMode === item.value ? ' settings-panel__segment--active' : ''}`}
+              disabled={item.disabled}
+              title={item.disabled ? '敬请期待' : undefined}
+              onClick={() => setFlipMode(item.value)}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

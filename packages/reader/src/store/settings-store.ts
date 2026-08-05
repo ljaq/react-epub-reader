@@ -10,7 +10,10 @@
  * - FONT_WEIGHT_MAP = { normal:400, light:300, bold:900 }
  * - THEME_MAP / THEME_BG_MAP
  * - DEFAULT_SETTINGS = { theme:'white', brightness:100, spacing:'medium',
- *   fontSize:22, fontWeight:'light', horizontalEnabled:true, eyeCareMode:false }
+ *   fontSize:22, fontWeight:'light', flipMode:'cover', horizontalEnabled:true, eyeCareMode:false }
+ * - flipMode 为 phase-10 新增；开发阶段不做老用户习惯迁移——旧 persist 数据
+ *   （无 flipMode 或非法值）一律回落默认 cover，不按 horizontalEnabled 推导；
+ *   horizontalEnabled 保留为派生字段，下游消费方零改动
  */
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { create } from 'zustand'
@@ -63,12 +66,32 @@ export const THEME_BG_MAP: Record<ThemeKey, string> = {
   dark: THEME_MAP.dark.bg
 }
 
+/**
+ * 翻页模式：
+ * - cover：覆盖（掌阅级：旧页滑出/新页滑入，底层页静止）
+ * - slide：平移（整轨横滑）
+ * - vertical：上下滚动
+ * - simulation：仿真翻页（预留，设置面板置灰占位，不可达渲染分支）
+ */
+export const FLIP_MODES = ['cover', 'slide', 'vertical', 'simulation'] as const
+export type FlipMode = (typeof FLIP_MODES)[number]
+
+export function isFlipMode(value: unknown): value is FlipMode {
+  return typeof value === 'string' && (FLIP_MODES as readonly string[]).includes(value)
+}
+
+/** horizontalEnabled 为 flipMode 的派生字段：非竖滚即横排。 */
+export function deriveHorizontalEnabled(flipMode: FlipMode): boolean {
+  return flipMode !== 'vertical'
+}
+
 export const DEFAULT_SETTINGS: ReaderSettings = {
   theme: 'white',
   brightness: 100,
   spacing: 'medium',
   fontSize: DEFAULT_FONT_SIZE,
   fontWeight: 'light',
+  flipMode: 'cover',
   horizontalEnabled: true,
   eyeCareMode: false
 }
@@ -79,8 +102,22 @@ export interface ReaderSettings {
   spacing: SpacingKey
   fontSize: number
   fontWeight: FontWeightKey
+  /** 翻页模式枚举；新装默认 cover。 */
+  flipMode: FlipMode
+  /** 派生同步字段（= flipMode !== 'vertical'），下游消费方零改动保留。 */
   horizontalEnabled: boolean
   eyeCareMode: boolean
+}
+
+/**
+ * 解析 flipMode：显式合法值优先；旧版 persist 数据（无 flipMode 或非法值）
+ * 一律回落默认 cover——开发阶段不做老用户习惯迁移（不按 horizontalEnabled 推导）。
+ */
+export function resolveFlipMode(settings: Partial<ReaderSettings> = {}): FlipMode {
+  if (isFlipMode(settings.flipMode)) {
+    return settings.flipMode
+  }
+  return DEFAULT_SETTINGS.flipMode
 }
 
 /** 对齐 Vue snapFontSize：取 FONT_SIZE_STEPS 中最接近的值。 */
@@ -113,10 +150,13 @@ export function resolveFontWeight(fontWeight: FontWeightKey): number {
 }
 
 export function normalizeSettings(settings: Partial<ReaderSettings> = {}): ReaderSettings {
+  const flipMode = resolveFlipMode(settings)
   return {
     ...DEFAULT_SETTINGS,
     ...settings,
-    fontSize: snapFontSize(settings.fontSize ?? DEFAULT_FONT_SIZE)
+    fontSize: snapFontSize(settings.fontSize ?? DEFAULT_FONT_SIZE),
+    flipMode,
+    horizontalEnabled: deriveHorizontalEnabled(flipMode)
   }
 }
 
@@ -126,7 +166,7 @@ interface SettingsState extends ReaderSettings {
 
 /**
  * 阅读设置 store。persist 到 localStorage key 'h5-reader-settings'。
- * 字段：theme/brightness/spacing/fontSize/fontWeight/horizontalEnabled/eyeCareMode。
+ * 字段：theme/brightness/spacing/fontSize/fontWeight/flipMode/horizontalEnabled/eyeCareMode。
  */
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -145,8 +185,9 @@ export const useSettingsStore = create<SettingsState>()(
         if (!persisted || typeof persisted !== 'object') {
           return { ...base, ...DEFAULT_SETTINGS }
         }
+        // 传原始 stored（勿先合 DEFAULT_SETTINGS）：flipMode 缺失是旧版数据的判定依据
         const stored = persisted as Partial<ReaderSettings>
-        return { ...base, ...normalizeSettings({ ...DEFAULT_SETTINGS, ...stored }) }
+        return { ...base, ...normalizeSettings(stored) }
       }
     }
   )

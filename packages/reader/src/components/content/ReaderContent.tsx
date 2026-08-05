@@ -1,5 +1,12 @@
 /**
- * 阅读引擎内容区分发 — 按 settings.horizontalEnabled 分发横划/竖滚。
+ * 阅读引擎内容区分发 — 按 settings.flipMode 分发覆盖/平移/竖滚（phase-10）。
+ *
+ * - cover：PagedReader（掌阅级覆盖翻页，真分页页式结构）
+ * - slide：HorizontalReader（整轨横滑，老用户默认，行为零改动）
+ * - vertical：VerticalReader（上下滚动，行为零改动）
+ * - simulation：仿真翻页预留（设置面板置灰不可选；persist 万一落入按 cover 渲染）
+ *
+ * horizontalEnabled 为 flipMode 派生字段（非竖滚即横排），下游消费方零改动。
  *
  * Phase 5：DOM 桥接 / 书签角标 / 竖滚 inline 试读提示 / atChapterEnd / 进度 scheduleReport。
  */
@@ -31,6 +38,7 @@ import { WriteAnnotationPanel } from '../popups/WriteAnnotationPanel/WriteAnnota
 import { ReadLoginTip } from '../overlays/ReadLoginTip/ReadLoginTip'
 import { HorizontalReader } from './HorizontalReader'
 import { VerticalReader } from './VerticalReader'
+import { PagedReader } from './paged/PagedReader'
 
 export interface ReaderContentProps {
   bookId: number
@@ -93,6 +101,7 @@ export function ReaderContent(props: ReaderContentProps): React.ReactNode {
     onLinkClick
   } = props
 
+  const flipMode = useSettingsStore((s) => s.flipMode)
   const horizontalEnabled = useSettingsStore((s) => s.horizontalEnabled)
   const chapterId = useReadingStore((s) => s.chapterId)
   const pageIndex = useReadingStore((s) => s.pageIndex)
@@ -242,8 +251,23 @@ export function ReaderContent(props: ReaderContentProps): React.ReactNode {
 
   return (
     <>
-      {horizontalEnabled ? (
+      {flipMode === 'slide' ? (
         <HorizontalReader
+          chapterList={chapterList}
+          chapters={chapters}
+          isChapterBlocked={isChapterBlocked}
+          onChapterChange={onChapterChange}
+          onError={onError}
+          selectionBridgeRef={selectionBridgeRef}
+          registerBody={registerBody}
+          registerViewport={registerViewport}
+          registerScrollRoot={registerScrollRoot}
+          paidChapterStart={paidChapterStart}
+          isLoggedIn={isLoggedIn}
+          onLinkClick={onLinkClick}
+        />
+      ) : flipMode !== 'vertical' ? (
+        <PagedReader
           chapterList={chapterList}
           chapters={chapters}
           isChapterBlocked={isChapterBlocked}
