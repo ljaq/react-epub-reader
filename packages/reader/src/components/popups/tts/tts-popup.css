@@ -267,3 +267,50 @@
     transform: rotate(360deg);
   }
 }
+
+.tts-popup-root,
+.tts-popup {
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.tts-popup__close,
+.tts-popup__title,
+.tts-popup__book-title,
+.control-box-item,
+.tts-popup__bottom-btn {
+  color: var(--reader-color, #1a1a1a);
+}
+
+.tts-popup__nav-link {
+  color: var(--reader-muted, rgba(0, 0, 0, 0.45));
+}
+
+.tts-popup__player {
+  background: var(--reader-surface-muted, rgba(171, 179, 191, 0.1));
+}
+
+.progress-track,
+.tts-popup__bottom-btn {
+  border-color: var(--reader-border, rgba(0, 0, 0, 0.1));
+}
+
+.progress-active,
+.progress-thumb,
+.control-box-item.play-pause {
+  background: var(--reader-accent, #1680fc);
+}
+
+.tts-popup__bottom-btn {
+  background: var(--reader-surface-raised, #ffffff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tts-popup-root,
+  .tts-popup,
+  .tts-popup * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

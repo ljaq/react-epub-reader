@@ -49,12 +49,64 @@ export const FONT_WEIGHT_MAP = {
 
 export type FontWeightKey = keyof typeof FONT_WEIGHT_MAP
 
-/** 项目主题色（背景/文字色保持不变） */
+/** 阅读器主题及其 Chrome / 弹层语义色。 */
 export const THEME_MAP = {
-  white: { bg: '#ffffff', color: '#1A1A1A', muted: 'rgba(0, 0, 0, 0.45)' },
-  yellow: { bg: '#FFF5DC', color: '#1A1A1A', muted: 'rgba(0, 0, 0, 0.45)' },
-  green: { bg: '#D8FBE7', color: '#1A1A1A', muted: 'rgba(0, 0, 0, 0.45)' },
-  dark: { bg: '#332F2F', color: '#999999', muted: 'rgba(153, 153, 153, 0.7)' }
+  white: {
+    bg: '#ffffff',
+    color: '#1A1A1A',
+    muted: 'rgba(0, 0, 0, 0.45)',
+    surface: '#ffffff',
+    surfaceRaised: '#ffffff',
+    surfaceMuted: '#f5f5f5',
+    border: 'rgba(0, 0, 0, 0.08)',
+    accent: '#1A1A1A',
+    accentSoft: 'rgba(26, 26, 26, 0.12)',
+    accentContrast: '#ffffff',
+    shadow: 'rgba(0, 0, 0, 0.1)',
+    overlay: 'rgba(0, 0, 0, 0.45)'
+  },
+  yellow: {
+    bg: '#FFF5DC',
+    color: '#1A1A1A',
+    muted: 'rgba(0, 0, 0, 0.45)',
+    surface: '#fff9ea',
+    surfaceRaised: '#fffdf5',
+    surfaceMuted: 'rgba(183, 121, 31, 0.08)',
+    border: 'rgba(126, 86, 24, 0.14)',
+    accent: '#b7791f',
+    accentSoft: 'rgba(183, 121, 31, 0.14)',
+    accentContrast: '#ffffff',
+    shadow: 'rgba(88, 60, 17, 0.16)',
+    overlay: 'rgba(65, 43, 8, 0.45)'
+  },
+  green: {
+    bg: '#D8FBE7',
+    color: '#1A1A1A',
+    muted: 'rgba(0, 0, 0, 0.45)',
+    surface: '#e9fff1',
+    surfaceRaised: '#f5fff8',
+    surfaceMuted: 'rgba(40, 145, 87, 0.08)',
+    border: 'rgba(35, 117, 70, 0.14)',
+    accent: '#258c57',
+    accentSoft: 'rgba(37, 140, 87, 0.14)',
+    accentContrast: '#ffffff',
+    shadow: 'rgba(24, 89, 49, 0.16)',
+    overlay: 'rgba(13, 61, 32, 0.45)'
+  },
+  dark: {
+    bg: '#332F2F',
+    color: '#D8D0D0',
+    muted: 'rgba(216, 208, 208, 0.68)',
+    surface: '#3d3737',
+    surfaceRaised: '#494141',
+    surfaceMuted: 'rgba(255, 255, 255, 0.08)',
+    border: 'rgba(255, 255, 255, 0.14)',
+    accent: '#b9d4ff',
+    accentSoft: 'rgba(185, 212, 255, 0.16)',
+    accentContrast: '#2b2525',
+    shadow: 'rgba(0, 0, 0, 0.32)',
+    overlay: 'rgba(0, 0, 0, 0.62)'
+  }
 } as const
 
 export type ThemeKey = keyof typeof THEME_MAP

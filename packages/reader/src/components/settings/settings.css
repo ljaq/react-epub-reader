@@ -456,3 +456,69 @@
 .font-weight-popup__check {
   flex-shrink: 0;
 }
+
+/* ───────────────── Theme tokens ───────────────── */
+.settings-panel,
+.font-panel,
+.font-weight-popup {
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  transition:
+    max-height 0.28s ease,
+    opacity 0.28s ease,
+    transform 0.28s ease,
+    background-color 0.24s ease,
+    color 0.24s ease;
+}
+
+.settings-panel__label,
+.font-panel__label,
+.settings-panel__segment,
+.font-panel__weight-trigger,
+.font-weight-popup__close,
+.font-weight-popup__option {
+  color: var(--reader-color, #1a1a1a);
+  transition: color 0.24s ease, background-color 0.24s ease, border-color 0.24s ease;
+}
+
+.settings-panel__track,
+.settings-panel__track-active,
+.font-panel__track,
+.font-panel__track-active,
+.settings-panel__segment,
+.font-panel__weight-trigger,
+.font-weight-popup__option {
+  background: var(--reader-surface-muted, rgba(0, 0, 0, 0.05));
+}
+
+.settings-panel__thumb,
+.font-panel__thumb,
+.font-weight-popup__option--active {
+  background: var(--reader-surface-raised, #ffffff);
+}
+
+.settings-panel__theme,
+.settings-panel__segment--active,
+.font-weight-popup__option--active {
+  border-color: var(--reader-accent, var(--reader-color, #1a1a1a));
+}
+
+.settings-panel__theme--active,
+.font-panel__size-btn,
+.settings-panel__eye-care {
+  color: var(--reader-accent, var(--reader-color, #1a1a1a));
+}
+
+.font-weight-popup-mask {
+  background: var(--reader-overlay, rgba(0, 0, 0, 0.45));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-panel,
+  .font-panel,
+  .settings-panel *,
+  .font-panel *,
+  .font-weight-popup * {
+    transition-duration: 0.01ms !important;
+  }
+}

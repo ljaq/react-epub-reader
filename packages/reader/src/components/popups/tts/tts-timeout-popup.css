@@ -66,3 +66,25 @@
 .timeout-option.active:not(.off) {
   font-size: 12px;
 }
+
+.timeout-popup {
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.timeout-popup-header,
+.timeout-popup-close,
+.timeout-option,
+.timeout-option.active {
+  color: var(--reader-color, #1a1a1a);
+}
+
+.timeout-option {
+  background-color: var(--reader-surface-muted, rgba(171, 179, 191, 0.15));
+}
+
+.timeout-option.active {
+  border-color: var(--reader-accent, #1680fc);
+  background: var(--reader-accent-soft, transparent);
+}

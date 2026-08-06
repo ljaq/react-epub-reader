@@ -62,3 +62,25 @@
   border: 1px solid #1a1a1a;
   background: transparent;
 }
+
+.voice-popup {
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.voice-popup-header,
+.voice-popup-close,
+.voice-option,
+.voice-option.active {
+  color: var(--reader-color, #1a1a1a);
+}
+
+.voice-option {
+  background-color: var(--reader-surface-muted, rgba(171, 179, 191, 0.15));
+}
+
+.voice-option.active {
+  border-color: var(--reader-accent, #1680fc);
+  background: var(--reader-accent-soft, transparent);
+}

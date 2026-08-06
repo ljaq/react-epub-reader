@@ -89,3 +89,27 @@
   background-color: #eeeeee;
   flex-shrink: 0;
 }
+
+.tts-pos-dialog {
+  background-color: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.tts-pos-dialog__close,
+.tts-pos-dialog__message,
+.tts-pos-dialog__btn--cancel {
+  color: var(--reader-muted, #666666);
+}
+
+.tts-pos-dialog__footer {
+  border-top-color: var(--reader-border, #eeeeee);
+}
+
+.tts-pos-dialog__divider {
+  background-color: var(--reader-border, #eeeeee);
+}
+
+.tts-pos-dialog__btn--confirm {
+  color: var(--reader-accent, #1680fc);
+}

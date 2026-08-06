@@ -348,3 +348,56 @@
   width: 24px;
   height: 24px;
 }
+
+.notes-popup,
+.notes-popup__sheet {
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.notes-popup__close,
+.notes-popup__title,
+.notes-popup__line-summary,
+.notes-popup__note-content,
+.notes-popup__more,
+.notes-popup__sheet-close {
+  color: var(--reader-color, #1a1a1a);
+}
+
+.notes-popup__tab,
+.notes-popup__empty-text,
+.notes-popup__time,
+.notes-popup__note-quote {
+  color: var(--reader-muted, rgba(0, 0, 0, 0.45));
+}
+
+.notes-popup__tabs,
+.notes-popup__line-item,
+.notes-popup__note-item,
+.notes-popup__bookmark-item {
+  border-color: var(--reader-border, rgba(0, 0, 0, 0.08));
+}
+
+.notes-popup__tabs {
+  background: var(--reader-surface-muted, rgba(0, 0, 0, 0.03));
+}
+
+.notes-popup__tab--active,
+.notes-popup__bookmark-item--current .notes-popup__line-summary,
+.notes-popup__line-icon--underline::after {
+  color: var(--reader-accent, #1680fc);
+  background-color: var(--reader-accent-soft, rgba(22, 128, 252, 0.12));
+}
+
+.notes-popup__tab--active {
+  background: var(--reader-surface-raised, #ffffff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notes-popup,
+  .notes-popup__sheet,
+  .notes-popup * {
+    transition-duration: 0.01ms !important;
+  }
+}

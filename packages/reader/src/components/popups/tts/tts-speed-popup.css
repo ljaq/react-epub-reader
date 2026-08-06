@@ -99,3 +99,24 @@
 .speed-thumb:active {
   cursor: grabbing;
 }
+
+.speed-popup {
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.speed-popup-header,
+.speed-popup-close,
+.speed-thumb {
+  color: var(--reader-color, #1a1a1a);
+}
+
+.speed-slider-wrap {
+  background-color: var(--reader-surface-muted, rgba(171, 179, 191, 0.1));
+}
+
+.speed-thumb {
+  background: var(--reader-surface-raised, #fff);
+  border-color: var(--reader-border, rgba(0, 0, 0, 0.05));
+}

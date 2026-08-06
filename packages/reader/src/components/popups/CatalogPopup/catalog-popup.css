@@ -281,3 +281,51 @@
   color: rgba(0, 0, 0, 0.45);
   text-align: center;
 }
+
+.catalog-popup-root,
+.catalog-popup,
+.catalog-popup__range-menu {
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.catalog-popup__close,
+.catalog-popup__title,
+.catalog-popup__book-title,
+.catalog-popup__range-item--active,
+.catalog-popup__range-check,
+.catalog-popup__chapter--active {
+  color: var(--reader-color, #1a1a1a);
+}
+
+.catalog-popup__book-author,
+.catalog-popup__book-read,
+.catalog-popup__book-arrow,
+.catalog-popup__total,
+.catalog-popup__range-trigger,
+.catalog-popup__range-item,
+.catalog-popup__chapter,
+.catalog-popup__empty {
+  color: var(--reader-muted, rgba(0, 0, 0, 0.55));
+}
+
+.catalog-popup__range-trigger,
+.catalog-popup__chapter::after,
+.catalog-popup__list {
+  border-color: var(--reader-border, rgba(0, 0, 0, 0.08));
+}
+
+.catalog-popup__range-trigger:hover,
+.catalog-popup__chapter:active,
+.catalog-popup__range-item:active {
+  background: var(--reader-surface-muted, rgba(0, 0, 0, 0.04));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .catalog-popup-root,
+  .catalog-popup,
+  .catalog-popup__range-menu {
+    transition-duration: 0.01ms !important;
+  }
+}

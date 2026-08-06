@@ -27,3 +27,15 @@
   left: 0;
   bottom: -7px;
 }
+
+.reader-footnote {
+  color: var(--reader-accent-contrast, #ffffff);
+  background: var(--reader-surface-raised, #444444);
+  box-shadow: 0 0 15px 0 var(--reader-shadow, rgba(0, 0, 0, 0.1));
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.reader-footnote__arr {
+  border-color: var(--reader-surface-raised, #444444);
+  background: var(--reader-surface-raised, #444444);
+}

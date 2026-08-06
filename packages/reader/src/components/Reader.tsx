@@ -20,6 +20,7 @@ import { useBookmarkStore } from '../store/bookmark-store'
 import { useUiStore } from '../store/ui-store'
 import { useNavigateToNavTarget, useInitialPositionRestore } from '../hooks/useNavigateToNavTarget'
 import { useReadingPositionReporter } from '../hooks/useReadingPositionReporter'
+import { useContentStyles } from '../hooks/useContentStyles'
 
 export function Reader(props: ReaderProps): React.ReactNode {
   const {
@@ -70,6 +71,7 @@ export function Reader(props: ReaderProps): React.ReactNode {
   const removePendingBookmark = useBookmarkStore((s) => s.removePendingBookmark)
   const annotationFailureRef = useRef<number>(0)
   const selectionBridgeRef = useRef<SelectionBridgeHandle | null>(null)
+  const { rootStyle: themeStyle } = useContentStyles()
 
   useNavigateToNavTarget()
   useInitialPositionRestore({ initialPosition, consumedRef: initialPositionConsumedRef })
@@ -132,7 +134,10 @@ export function Reader(props: ReaderProps): React.ReactNode {
   }
 
   return (
-    <div data-reader-root style={{ width: '100%', height: '100%' }}>
+    <div
+      data-reader-root
+      style={{ width: '100%', height: '100%', ...themeStyle }}
+    >
       <ReaderContent
         bookId={bookId}
         chapterList={chapterList}

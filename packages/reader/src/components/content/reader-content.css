@@ -400,3 +400,19 @@
   object-fit: contain;
   pointer-events: none;
 }
+
+.reader-content,
+.reader-content__viewport-h,
+.reader-content__viewport-v,
+.reader-content__body {
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-content,
+  .reader-content__viewport-h,
+  .reader-content__viewport-v,
+  .reader-content__body {
+    transition-duration: 0.01ms !important;
+  }
+}

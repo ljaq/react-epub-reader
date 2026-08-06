@@ -99,13 +99,25 @@ export function useContentStyles(): ReaderContentStyles {
       rootStyle: {
         '--reader-bg': palette.bg,
         '--reader-color': palette.color,
+        '--reader-muted': palette.muted,
+        '--reader-surface': palette.surface,
+        '--reader-surface-raised': palette.surfaceRaised,
+        '--reader-surface-muted': palette.surfaceMuted,
+        '--reader-border': palette.border,
+        '--reader-accent': palette.accent,
+        '--reader-accent-soft': palette.accentSoft,
+        '--reader-accent-contrast': palette.accentContrast,
+        '--reader-shadow': palette.shadow,
+        '--reader-overlay': palette.overlay,
+        '--reader-image-preview-bg': palette.surfaceRaised,
         '--reader-font-size': `${fontSize}px`,
         '--reader-font-weight': resolveFontWeight(fontWeight),
         '--reader-line-height': resolveLineHeight(spacing),
         '--reader-chapter-btn-bg': isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
-        '--reader-chapter-btn-color': '#1680fc',
+        '--reader-chapter-btn-color': palette.accent,
         backgroundColor: palette.bg,
-        color: palette.color
+        color: palette.color,
+        transition: 'background-color 0.24s ease, color 0.24s ease'
       } as React.CSSProperties,
       contentBodyStyle: {
         '--reader-font-size': `${fontSize}px`,

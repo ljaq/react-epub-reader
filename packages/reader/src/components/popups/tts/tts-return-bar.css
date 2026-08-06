@@ -27,3 +27,9 @@
   flex-shrink: 0;
   transform: rotate(90deg);
 }
+
+.tts-return-bar {
+  background: var(--reader-surface-raised, rgba(0, 0, 0, 0.5));
+  color: var(--reader-accent-contrast, #fff);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}

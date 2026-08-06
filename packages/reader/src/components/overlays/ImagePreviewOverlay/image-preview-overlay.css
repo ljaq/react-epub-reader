@@ -13,6 +13,11 @@
   pointer-events: auto;
 }
 
+.reader-image-preview {
+  background-color: var(--reader-image-preview-bg, #222222);
+  transition: transform 0.3s, background-color 0.24s ease;
+}
+
 .reader-image-preview__img {
   position: relative;
   width: 100%;

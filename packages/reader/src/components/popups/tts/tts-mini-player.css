@@ -120,3 +120,14 @@
     transform: rotate(360deg);
   }
 }
+
+.tts-mini-player__pill {
+  background: var(--reader-surface-raised, rgba(0, 0, 0, 0.75));
+  color: var(--reader-accent-contrast, #fff);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
+
+.tts-mini-player__control,
+.tts-mini-player__close {
+  color: var(--reader-accent-contrast, #fff);
+}

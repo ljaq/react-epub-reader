@@ -106,3 +106,14 @@
   padding-left: var(--reader-h-pad-x);
   padding-right: var(--reader-h-pad-x);
 }
+
+.paged-reader__page {
+  background-color: var(--reader-bg);
+  transition: background-color 0.24s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paged-reader__page {
+    transition-duration: 0.01ms !important;
+  }
+}

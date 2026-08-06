@@ -24,3 +24,9 @@
     transform: translateY(0);
   }
 }
+
+.tts-sub-popup-sheet {
+  background: var(--reader-surface, #fff);
+  color: var(--reader-color, #1a1a1a);
+  transition: background-color 0.24s ease, color 0.24s ease;
+}
