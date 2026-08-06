@@ -1,35 +1,7 @@
 /**
- * 目录弹窗样式 — 逐字对照 old-vue-reader/components/CatalogPopup/index.vue <style>。
- * 弹层 78vh，底部 sheet，圆角顶部。
+ * 目录弹窗样式 — 布局/定位由 BottomSheet 组件统一管理。
+ * 本文件仅保留内容区样式。
  */
-
-.catalog-popup-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 10001;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.catalog-popup-mask--tts {
-  z-index: 10003;
-}
-
-.catalog-popup-root {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 480px;
-  height: 78vh;
-  max-height: 78vh;
-  overflow: hidden;
-  background: #ffffff;
-  color: #1a1a1a;
-  border-radius: 16px 16px 0 0;
-  box-sizing: border-box;
-}
 
 .catalog-popup {
   display: flex;
@@ -38,8 +10,8 @@
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  background: #ffffff;
-  color: #1a1a1a;
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
 }
 
 .catalog-popup__header {
@@ -282,7 +254,6 @@
   text-align: center;
 }
 
-.catalog-popup-root,
 .catalog-popup,
 .catalog-popup__range-menu {
   background: var(--reader-surface, #ffffff);
@@ -323,7 +294,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .catalog-popup-root,
   .catalog-popup,
   .catalog-popup__range-menu {
     transition-duration: 0.01ms !important;

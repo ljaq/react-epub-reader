@@ -16,6 +16,7 @@ import { navigateToChapter } from '../../chrome/navigation'
 import { callGoTtsChapter } from '../tts/tts-actions'
 import { useTtsStore } from '../../../store/tts-store'
 import { CloseIcon } from '../../settings/FontIcons'
+import { BottomSheet } from '../../BottomSheet/BottomSheet'
 import './catalog-popup.css'
 
 const PAGE_SIZE = 50
@@ -129,6 +130,9 @@ export function CatalogPopup(props: CatalogPopupProps): React.ReactNode {
   const handleListScroll = () => setRangeDropdownOpen(false)
   const toggleRangeDropdown = () => setRangeDropdownOpen((v) => !v)
 
+  // TTS 弹窗同时打开时提升 z-index
+  const zIndex = ttsPopupOpen ? 10003 : 10001
+
   const handleRangeSelect = (page: number) => {
     setRangeDropdownOpen(false)
     if (page === currentPage) return
@@ -159,83 +163,77 @@ export function CatalogPopup(props: CatalogPopupProps): React.ReactNode {
     closePopup('catalog')
   }
 
-  if (!visible) return null
-
-  const maskClass = `catalog-popup-mask${ttsPopupOpen ? ' catalog-popup-mask--tts' : ''}`
-
   return (
-    <div className={maskClass} onClick={handleClose}>
-      <div className="catalog-popup-root" onClick={(e) => e.stopPropagation()}>
-        <div className="catalog-popup" onClick={handleRootClick}>
-          <div className="catalog-popup__header">
-            <button type="button" className="catalog-popup__close" aria-label="关闭" onClick={handleClose}>
-              <CloseIcon />
-            </button>
-            <span className="catalog-popup__title">目录</span>
-          </div>
-
-          <button type="button" className="catalog-popup__book" onClick={handleBookDetail}>
-            <div className="catalog-popup__cover-wrapper">
-              {bookMeta && bookMeta.bookPic ? (
-                <img className="catalog-popup__cover" src={bookMeta.bookPic} alt="" />
-              ) : (
-                <div className="catalog-popup__cover" />
-              )}
-            </div>
-            <div className="catalog-popup__book-info">
-              <div className="catalog-popup__book-title">{displayTitle}</div>
-              <div className="catalog-popup__book-author">{displayAuthor}</div>
-              <div className="catalog-popup__book-read">已读：5分钟</div>
-            </div>
-            <span className="catalog-popup__book-arrow">
-              <BookArrow />
-            </span>
+    <BottomSheet visible={visible} onClose={handleClose} height="78vh" zIndex={zIndex}>
+      <div className="catalog-popup" onClick={handleRootClick}>
+        <div className="catalog-popup__header">
+          <button type="button" className="catalog-popup__close" aria-label="关闭" onClick={handleClose}>
+            <CloseIcon />
           </button>
+          <span className="catalog-popup__title">目录</span>
+        </div>
 
-          <div className="catalog-popup__range-bar">
-            <span className="catalog-popup__total">共{totalChapters}章</span>
-            <div className="catalog-popup__range-wrap">
-              <button type="button" className="catalog-popup__range-trigger" onClick={toggleRangeDropdown}>
-                <span>{currentRangeLabel}</span>
-                <RangeChevron />
-              </button>
-              {rangeDropdownOpen ? (
-                <div className="catalog-popup__range-menu" onClick={(e) => e.stopPropagation()}>
-                  {rangeOptions.map((option) => (
-                    <button
-                      key={option.page}
-                      type="button"
-                      className={`catalog-popup__range-item${option.page === currentPage ? ' catalog-popup__range-item--active' : ''}`}
-                      onClick={() => handleRangeSelect(option.page)}
-                    >
-                      <span className="catalog-popup__range-check">
-                        {option.page === currentPage ? <RangeCheck /> : null}
-                      </span>
-                      <span>{formatRangeLabel(option)}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+        <button type="button" className="catalog-popup__book" onClick={handleBookDetail}>
+          <div className="catalog-popup__cover-wrapper">
+            {bookMeta && bookMeta.bookPic ? (
+              <img className="catalog-popup__cover" src={bookMeta.bookPic} alt="" />
+            ) : (
+              <div className="catalog-popup__cover" />
+            )}
           </div>
+          <div className="catalog-popup__book-info">
+            <div className="catalog-popup__book-title">{displayTitle}</div>
+            <div className="catalog-popup__book-author">{displayAuthor}</div>
+            <div className="catalog-popup__book-read">已读：5分钟</div>
+          </div>
+          <span className="catalog-popup__book-arrow">
+            <BookArrow />
+          </span>
+        </button>
 
-          <div className="catalog-popup__list" onScroll={handleListScroll}>
-            {displayChapters.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`catalog-popup__chapter${Number(item.id) === Number(chapterId) ? ' catalog-popup__chapter--active' : ''}`}
-                onClick={() => handleChapterClick(item.id)}
-              >
-                {item.chapterName}
-              </button>
-            ))}
-            {!displayChapters.length ? (
-              <div className="catalog-popup__empty">暂无章节</div>
+        <div className="catalog-popup__range-bar">
+          <span className="catalog-popup__total">共{totalChapters}章</span>
+          <div className="catalog-popup__range-wrap">
+            <button type="button" className="catalog-popup__range-trigger" onClick={toggleRangeDropdown}>
+              <span>{currentRangeLabel}</span>
+              <RangeChevron />
+            </button>
+            {rangeDropdownOpen ? (
+              <div className="catalog-popup__range-menu" onClick={(e) => e.stopPropagation()}>
+                {rangeOptions.map((option) => (
+                  <button
+                    key={option.page}
+                    type="button"
+                    className={`catalog-popup__range-item${option.page === currentPage ? ' catalog-popup__range-item--active' : ''}`}
+                    onClick={() => handleRangeSelect(option.page)}
+                  >
+                    <span className="catalog-popup__range-check">
+                      {option.page === currentPage ? <RangeCheck /> : null}
+                    </span>
+                    <span>{formatRangeLabel(option)}</span>
+                  </button>
+                ))}
+              </div>
             ) : null}
           </div>
         </div>
+
+        <div className="catalog-popup__list" onScroll={handleListScroll}>
+          {displayChapters.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`catalog-popup__chapter${Number(item.id) === Number(chapterId) ? ' catalog-popup__chapter--active' : ''}`}
+              onClick={() => handleChapterClick(item.id)}
+            >
+              {item.chapterName}
+            </button>
+          ))}
+          {!displayChapters.length ? (
+            <div className="catalog-popup__empty">暂无章节</div>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

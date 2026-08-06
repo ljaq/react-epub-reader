@@ -3,7 +3,7 @@
  */
 import { useTtsStore } from '../../../store/tts-store'
 import { ChevronDownIcon } from './tts-shared'
-import './tts-sub-popup.css'
+import { BottomSheet } from '../../BottomSheet/BottomSheet'
 import './tts-timeout-popup.css'
 
 const TIMEOUT_OPTIONS = [
@@ -53,32 +53,28 @@ export function TtsTimeoutPopup(props: TtsTimeoutPopupProps): React.ReactNode {
     return option.label
   }
 
-  if (!visible) return null
-
   return (
-    <div className="tts-sub-popup-overlay" onClick={onClose}>
-      <div className="tts-sub-popup-sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="timeout-popup">
-          <div className="timeout-popup-header">
-            <button type="button" className="timeout-popup-close" aria-label="关闭" onClick={onClose}>
-              <span className="timeout-popup-close-icon"><ChevronDownIcon /></span>
+    <BottomSheet visible={visible} onClose={onClose} height="auto" zIndex={10002}>
+      <div className="timeout-popup">
+        <div className="timeout-popup-header">
+          <button type="button" className="timeout-popup-close" aria-label="关闭" onClick={onClose}>
+            <span className="timeout-popup-close-icon"><ChevronDownIcon /></span>
+          </button>
+          <span>定时</span>
+        </div>
+        <div className="timeout-options">
+          {TIMEOUT_OPTIONS.map((option) => (
+            <button
+              key={String(option.value)}
+              type="button"
+              className={`timeout-option${isActive(option.value) ? ' active' : ''} ${option.value}`}
+              onClick={() => handleSelect(option.value)}
+            >
+              {labelFor(option)}
             </button>
-            <span>定时</span>
-          </div>
-          <div className="timeout-options">
-            {TIMEOUT_OPTIONS.map((option) => (
-              <button
-                key={String(option.value)}
-                type="button"
-                className={`timeout-option${isActive(option.value) ? ' active' : ''} ${option.value}`}
-                onClick={() => handleSelect(option.value)}
-              >
-                {labelFor(option)}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

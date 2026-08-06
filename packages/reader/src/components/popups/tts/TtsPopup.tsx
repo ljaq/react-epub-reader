@@ -8,6 +8,7 @@ import { useUiStore } from '../../../store/ui-store'
 import { TtsSpeedPopup } from './TtsSpeedPopup'
 import { TtsTimeoutPopup } from './TtsTimeoutPopup'
 import { TtsVoicePopup } from './TtsVoicePopup'
+import { BottomSheet } from '../../BottomSheet/BottomSheet'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -126,107 +127,103 @@ export function TtsPopup(props: TtsPopupProps): React.ReactNode {
     await onStartPlayback()
   }
 
-  if (!visible) return null
-
   return (
     <>
-      <div className="tts-popup-mask" onClick={handleClose}>
-        <div className="tts-popup-root" onClick={(e) => e.stopPropagation()}>
-          <div className="tts-popup">
-            <div className="tts-popup__header">
-              <button type="button" className="tts-popup__close" aria-label="关闭" onClick={handleClose}>
-                <span className="tts-popup__close-icon"><ChevronDownIcon /></span>
-              </button>
-              <span className="tts-popup__title">语音朗读</span>
-            </div>
+      <BottomSheet visible={visible} onClose={handleClose} height="auto" maxHeight="78vh" zIndex={10001}>
+        <div className="tts-popup">
+          <div className="tts-popup__header">
+            <button type="button" className="tts-popup__close" aria-label="关闭" onClick={handleClose}>
+              <span className="tts-popup__close-icon"><ChevronDownIcon /></span>
+            </button>
+            <span className="tts-popup__title">语音朗读</span>
+          </div>
 
-            <div className="tts-popup__book">
-              <div className="tts-popup__cover-wrapper">
-                {bookMeta.bookPic ? (
-                  <img className="tts-popup__cover" src={bookMeta.bookPic} alt="" />
-                ) : (
-                  <div className="tts-popup__cover tts-popup__cover--placeholder" />
-                )}
-              </div>
-              <div className="tts-popup__book-title">{displayTitle}</div>
+          <div className="tts-popup__book">
+            <div className="tts-popup__cover-wrapper">
+              {bookMeta.bookPic ? (
+                <img className="tts-popup__cover" src={bookMeta.bookPic} alt="" />
+              ) : (
+                <div className="tts-popup__cover tts-popup__cover--placeholder" />
+              )}
             </div>
+            <div className="tts-popup__book-title">{displayTitle}</div>
+          </div>
 
-            <div className="tts-popup__nav">
-              <button type="button" className="tts-popup__nav-link" onClick={handleReadOriginal}>
-                阅读原文
-                <ChevronRightIcon />
-              </button>
-              <button type="button" className="tts-popup__nav-link" onClick={onOpenCatalog}>
-                目录 共{totalChapters}章
-                <ChevronRightIcon />
-              </button>
-            </div>
+          <div className="tts-popup__nav">
+            <button type="button" className="tts-popup__nav-link" onClick={handleReadOriginal}>
+              阅读原文
+              <ChevronRightIcon />
+            </button>
+            <button type="button" className="tts-popup__nav-link" onClick={onOpenCatalog}>
+              目录 共{totalChapters}章
+              <ChevronRightIcon />
+            </button>
+          </div>
 
-            <div className="tts-popup__player">
-              <div className="track-wrapper">
-                <div ref={trackRef} className="progress-track">
-                  <div className="progress-active" style={{ width: `${activeBarWidth}px` }} />
-                  <div ref={thumbRef} className="progress-thumb" style={{ left: `${thumbLeft}px` }}>
-                    {displayCurrentTimeFormatted}/{displayTotalTimeFormatted}
-                  </div>
+          <div className="tts-popup__player">
+            <div className="track-wrapper">
+              <div ref={trackRef} className="progress-track">
+                <div className="progress-active" style={{ width: `${activeBarWidth}px` }} />
+                <div ref={thumbRef} className="progress-thumb" style={{ left: `${thumbLeft}px` }}>
+                  {displayCurrentTimeFormatted}/{displayTotalTimeFormatted}
                 </div>
               </div>
-
-              <div className="control-box">
-                <button type="button" className="control-box-item" aria-label="后退15秒" onClick={onSeekBackward}>
-                  <img src={ICON_SEEK_BACK} alt="" />
-                </button>
-                <button
-                  type="button"
-                  className="control-box-item"
-                  disabled={!canPrevChapter}
-                  aria-label="上一章"
-                  onClick={onPrevChapter}
-                >
-                  <PrevChapterIcon />
-                </button>
-                <button
-                  type="button"
-                  className={`control-box-item play-pause${loading ? ' play-pause--loading' : ''}`}
-                  aria-label="播放暂停"
-                  onClick={() => void togglePlay()}
-                >
-                  {loading ? <PlayLoadingIcon className="play-pause__loading" /> : null}
-                  {!loading && playing ? <PauseControlIcon /> : null}
-                  {!loading && !playing ? <PlayControlIcon /> : null}
-                </button>
-                <button
-                  type="button"
-                  className="control-box-item"
-                  disabled={!canNextChapter}
-                  aria-label="下一章"
-                  onClick={onNextChapter}
-                >
-                  <NextChapterIcon />
-                </button>
-                <button type="button" className="control-box-item" aria-label="前进15秒" onClick={onSeekForward}>
-                  <img src={ICON_SEEK_FORWARD} alt="" />
-                </button>
-              </div>
             </div>
 
-            <div className="tts-popup__bottom">
-              <button type="button" className="tts-popup__bottom-btn" onClick={() => setShowSpeed(true)}>
-                <span>倍速: {speedLabel}</span>
-                <ChevronRightIcon opacity={1} />
+            <div className="control-box">
+              <button type="button" className="control-box-item" aria-label="后退15秒" onClick={onSeekBackward}>
+                <img src={ICON_SEEK_BACK} alt="" />
               </button>
-              <button type="button" className="tts-popup__bottom-btn" onClick={() => setShowTimeout(true)}>
-                <span>{timeoutButtonLabel}</span>
-                <ChevronRightIcon opacity={1} />
+              <button
+                type="button"
+                className="control-box-item"
+                disabled={!canPrevChapter}
+                aria-label="上一章"
+                onClick={onPrevChapter}
+              >
+                <PrevChapterIcon />
               </button>
-              <button type="button" className="tts-popup__bottom-btn" onClick={() => setShowVoice(true)}>
-                <span>{getVoiceLabel()}</span>
-                <ChevronRightIcon opacity={1} />
+              <button
+                type="button"
+                className={`control-box-item play-pause${loading ? ' play-pause--loading' : ''}`}
+                aria-label="播放暂停"
+                onClick={() => void togglePlay()}
+              >
+                {loading ? <PlayLoadingIcon className="play-pause__loading" /> : null}
+                {!loading && playing ? <PauseControlIcon /> : null}
+                {!loading && !playing ? <PlayControlIcon /> : null}
+              </button>
+              <button
+                type="button"
+                className="control-box-item"
+                disabled={!canNextChapter}
+                aria-label="下一章"
+                onClick={onNextChapter}
+              >
+                <NextChapterIcon />
+              </button>
+              <button type="button" className="control-box-item" aria-label="前进15秒" onClick={onSeekForward}>
+                <img src={ICON_SEEK_FORWARD} alt="" />
               </button>
             </div>
           </div>
+
+          <div className="tts-popup__bottom">
+            <button type="button" className="tts-popup__bottom-btn" onClick={() => setShowSpeed(true)}>
+              <span>倍速: {speedLabel}</span>
+              <ChevronRightIcon opacity={1} />
+            </button>
+            <button type="button" className="tts-popup__bottom-btn" onClick={() => setShowTimeout(true)}>
+              <span>{timeoutButtonLabel}</span>
+              <ChevronRightIcon opacity={1} />
+            </button>
+            <button type="button" className="tts-popup__bottom-btn" onClick={() => setShowVoice(true)}>
+              <span>{getVoiceLabel()}</span>
+              <ChevronRightIcon opacity={1} />
+            </button>
+          </div>
         </div>
-      </div>
+      </BottomSheet>
 
       <TtsSpeedPopup visible={showSpeed} onClose={() => setShowSpeed(false)} />
       <TtsTimeoutPopup visible={showTimeout} onClose={() => setShowTimeout(false)} />

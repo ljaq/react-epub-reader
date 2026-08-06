@@ -1,28 +1,14 @@
-.notes-popup-root {
-  position: fixed;
-  inset: 0;
-  z-index: 10001;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.notes-popup__mask {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-}
+/**
+ * 笔记弹窗内容样式 — 布局/定位由 BottomSheet 统一管理。
+ */
 
 .notes-popup {
-  position: relative;
   display: flex;
   flex-direction: column;
-  height: 78vh;
-  max-height: 78vh;
+  height: 100%;
   overflow: hidden;
-  border-radius: 16px 16px 0 0;
-  background: #ffffff;
-  color: #1a1a1a;
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
 }
 
 .notes-popup__header {

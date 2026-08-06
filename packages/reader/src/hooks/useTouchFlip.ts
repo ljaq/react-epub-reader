@@ -69,6 +69,7 @@ export function useTouchFlip(input: UseTouchFlipInput): {
   const setGlobalPageIndex = useReadingStore((s) => s.setGlobalPageIndex)
   const setFlipping = useReadingStore((s) => s.setFlipping)
   const toggleUi = useUiStore((s) => s.toggleUi)
+  const setUiVisible = useUiStore((s) => s.setUiVisible)
 
   const draggingRef = useRef(false)
   const pointerIdRef = useRef<number | null>(null)
@@ -218,7 +219,13 @@ export function useTouchFlip(input: UseTouchFlipInput): {
         if (Math.abs(dx) < AXIS_LOCK_THRESHOLD && Math.abs(dy) < AXIS_LOCK_THRESHOLD) return
         axisLockRef.current = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'
         // 首次确定横向拖拽时才显示阴影（按下没动不显示）
-        if (axisLockRef.current === 'x') setFlipping(true)
+        if (axisLockRef.current === 'x') {
+          setFlipping(true)
+          // 滑动翻页时自动隐藏顶部/底部工具栏
+          if (useUiStore.getState().uiVisible) {
+            setUiVisible(false)
+          }
+        }
       }
       if (axisLockRef.current !== 'x') return
       e.preventDefault()

@@ -12,6 +12,7 @@ import {
 } from '../../store/settings-store'
 import { useSettingsStore } from '../../store/settings-store'
 import { useUiStore } from '../../store/ui-store'
+import { BottomSheet } from '../BottomSheet/BottomSheet'
 import {
   CheckIcon,
   ChevronIcon,
@@ -196,36 +197,34 @@ export function FontPanel(): React.ReactNode {
         </button>
       </div>
 
-      {weightPopupVisible ? (
-        <div className="font-weight-popup-mask" onClick={() => setWeightPopupVisible(false)}>
-          <div className="font-weight-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="font-weight-popup__header">
+      <BottomSheet visible={weightPopupVisible} onClose={() => setWeightPopupVisible(false)} height="auto" zIndex={10001}>
+        <div className="font-weight-popup">
+          <div className="font-weight-popup__header">
+            <button
+              type="button"
+              className="font-weight-popup__close"
+              aria-label="关闭"
+              onClick={() => setWeightPopupVisible(false)}
+            >
+              <CloseIcon />
+            </button>
+            <span className="font-weight-popup__title">字体设置</span>
+          </div>
+          <div className="font-weight-popup__options">
+            {FONT_WEIGHT_OPTIONS.map((item) => (
               <button
+                key={item.value}
                 type="button"
-                className="font-weight-popup__close"
-                aria-label="关闭"
-                onClick={() => setWeightPopupVisible(false)}
+                className={`font-weight-popup__option${settings.fontWeight === item.value ? ' font-weight-popup__option--active' : ''}`}
+                onClick={() => selectFontWeight(item.value)}
               >
-                <CloseIcon />
+                <span>{item.label}</span>
+                {settings.fontWeight === item.value ? <CheckIcon /> : null}
               </button>
-              <span className="font-weight-popup__title">字体设置</span>
-            </div>
-            <div className="font-weight-popup__options">
-              {FONT_WEIGHT_OPTIONS.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  className={`font-weight-popup__option${settings.fontWeight === item.value ? ' font-weight-popup__option--active' : ''}`}
-                  onClick={() => selectFontWeight(item.value)}
-                >
-                  <span>{item.label}</span>
-                  {settings.fontWeight === item.value ? <CheckIcon /> : null}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
-      ) : null}
+      </BottomSheet>
     </div>
   )
 }

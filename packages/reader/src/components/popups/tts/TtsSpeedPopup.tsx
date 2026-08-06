@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTtsStore } from '../../../store/tts-store'
 import { ChevronDownIcon } from './tts-shared'
-import './tts-sub-popup.css'
+import { BottomSheet } from '../../BottomSheet/BottomSheet'
 import './tts-speed-popup.css'
 
 const SPEED_MIN = 0.5
@@ -103,41 +103,37 @@ export function TtsSpeedPopup(props: TtsSpeedPopupProps): React.ReactNode {
     }
   }, [dragging, pickSpeedAtClientX])
 
-  if (!visible) return null
-
   return (
-    <div className="tts-sub-popup-overlay" onClick={onClose}>
-      <div className="tts-sub-popup-sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="speed-popup">
-          <div className="speed-popup-header">
-            <button type="button" className="speed-popup-close" aria-label="关闭" onClick={onClose}>
-              <span className="speed-popup-close-icon"><ChevronDownIcon /></span>
-            </button>
-            <span>倍速</span>
-          </div>
-          <div className={`speed-slider-wrap${dragging ? ' dragging' : ''}`}>
-            <span className="label-slow">慢</span>
-            <div className="speed-track" ref={trackRef} onClick={(e) => !dragging && pickSpeedAtClientX(e.clientX)}>
-              <div className="speed-ticks">
-                {Array.from({ length: 15 }).map((_, i) => (
-                  <span key={i} className="speed-tick" style={{ left: `${(i + 1) * (100 / 16)}%` }} />
-                ))}
-              </div>
-              <button
-                type="button"
-                ref={thumbRef}
-                className="speed-thumb"
-                style={{ left: `${thumbLeft}px` }}
-                onMouseDown={() => setDragging(true)}
-                onTouchStart={() => setDragging(true)}
-              >
-                {displaySpeed}
-              </button>
+    <BottomSheet visible={visible} onClose={onClose} height="auto" zIndex={10002}>
+      <div className="speed-popup">
+        <div className="speed-popup-header">
+          <button type="button" className="speed-popup-close" aria-label="关闭" onClick={onClose}>
+            <span className="speed-popup-close-icon"><ChevronDownIcon /></span>
+          </button>
+          <span>倍速</span>
+        </div>
+        <div className={`speed-slider-wrap${dragging ? ' dragging' : ''}`}>
+          <span className="label-slow">慢</span>
+          <div className="speed-track" ref={trackRef} onClick={(e) => !dragging && pickSpeedAtClientX(e.clientX)}>
+            <div className="speed-ticks">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <span key={i} className="speed-tick" style={{ left: `${(i + 1) * (100 / 16)}%` }} />
+              ))}
             </div>
-            <span className="label-fast">快</span>
+            <button
+              type="button"
+              ref={thumbRef}
+              className="speed-thumb"
+              style={{ left: `${thumbLeft}px` }}
+              onMouseDown={() => setDragging(true)}
+              onTouchStart={() => setDragging(true)}
+            >
+              {displaySpeed}
+            </button>
           </div>
+          <span className="label-fast">快</span>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

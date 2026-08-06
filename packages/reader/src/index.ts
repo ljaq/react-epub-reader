@@ -63,3 +63,7 @@ export type {
   ThemeKey
 } from './store/settings-store'
 export type { ActivePanel, PopupName, ReaderPopups } from './store/ui-store'
+
+// BottomSheet 通用底部弹窗
+export { BottomSheet } from './components/BottomSheet/BottomSheet'
+export type { BottomSheetProps } from './components/BottomSheet/BottomSheet'

@@ -20,6 +20,7 @@ import { useUiStore } from '../../../store/ui-store'
 import { useSettingsStore } from '../../../store/settings-store'
 import { computeReadingSnapshotFromDom } from '../../../hooks/useReadingSnapshot'
 import { navigateToNavTarget } from '../../../hooks/useNavigateToNavTarget'
+import { BottomSheet } from '../../BottomSheet/BottomSheet'
 import './notes-popup.css'
 
 const TABS = [
@@ -176,14 +177,12 @@ export function NotesPopup(props: NotesPopupProps): React.ReactNode {
     }
   }, [visible])
 
-  if (!visible) return null
-
-  // phase-12 perf：快照计算移到 visible 早退之后——本组件订阅 pageIndex，
-  // 每次翻页都重渲染，原实现即使弹窗关闭也同步执行
-  // computeReadingSnapshotFromDom()（逐字符 Range.getClientRects 扫描，
-  // 成本 O(当前页之前的字符数)），是平移模式松手后卡顿、越靠章节末尾越卡的
-  // 根因之一。横划模式 findBookmarkAtSnapshot 仅按 pageIndex 匹配，传 null。
-  const currentSnapshot = horizontalEnabled ? null : computeReadingSnapshotFromDom()
+  // phase-12 perf：仅在弹窗可见时计算快照，避免不必要的 DOM 扫描
+  const currentSnapshot = visible
+    ? horizontalEnabled
+      ? null
+      : computeReadingSnapshotFromDom()
+    : null
 
   const handleClose = () => closePopup('notes')
 
@@ -298,8 +297,7 @@ export function NotesPopup(props: NotesPopupProps): React.ReactNode {
   }
 
   return (
-    <div className="notes-popup-root" role="dialog" aria-modal="true">
-      <div className="notes-popup__mask" onClick={handleClose} aria-hidden="true" />
+    <BottomSheet visible={visible} onClose={handleClose} height="78vh" zIndex={10001}>
       <div className="notes-popup">
         <div className="notes-popup__header">
           <button type="button" className="notes-popup__close" aria-label="关闭" onClick={handleClose}>
@@ -501,6 +499,6 @@ export function NotesPopup(props: NotesPopupProps): React.ReactNode {
           </div>
         </div>
       )}
-    </div>
+    </BottomSheet>
   )
 }

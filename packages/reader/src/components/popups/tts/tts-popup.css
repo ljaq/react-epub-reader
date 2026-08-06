@@ -1,36 +1,11 @@
-.tts-popup-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 10001;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-}
-
-.tts-popup-root {
-  width: 100%;
-  max-width: 480px;
-  max-height: 78vh;
-  border-radius: 16px 16px 0 0;
-  overflow: hidden;
-  background: #fff;
-  animation: tts-popup-slide-up 0.28s ease;
-}
-
-@keyframes tts-popup-slide-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
+/**
+ * TTS 弹窗内容样式 — 布局/定位/动画由 BottomSheet 统一管理。
+ */
 
 .tts-popup {
   padding: 0 20px 24px;
-  background: #ffffff;
-  color: #1a1a1a;
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
 }
 
 .tts-popup__header {
@@ -268,7 +243,6 @@
   }
 }
 
-.tts-popup-root,
 .tts-popup {
   background: var(--reader-surface, #ffffff);
   color: var(--reader-color, #1a1a1a);
@@ -307,7 +281,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tts-popup-root,
   .tts-popup,
   .tts-popup * {
     animation-duration: 0.01ms !important;

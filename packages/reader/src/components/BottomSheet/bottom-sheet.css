@@ -1,0 +1,47 @@
+/**
+ * BottomSheet 通用底部弹窗样式。
+ *
+ * 动画完全由 React state（offset/maskOpacity）驱动，
+ * 不使用 CSS transition / animation，避免状态机复杂度。
+ */
+
+/* ===== root 容器 ===== */
+.bottomsheet-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: var(--bottomsheet-z-index, 10001);
+  pointer-events: none;
+}
+
+.bottomsheet-root--interactive {
+  pointer-events: auto;
+}
+
+/* ===== 遮罩层 ===== */
+.bottomsheet-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  /* opacity 由 React inline style 控制 */
+}
+
+/* ===== 面板层 ===== */
+.bottomsheet-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
+  /* transform: translateY() 由 React inline style 控制 */
+  will-change: transform;
+}
+
+/* 拖拽中提升合成层优先级，保证跟手流畅 */
+.bottomsheet-sheet--dragging {
+  will-change: transform, opacity;
+}

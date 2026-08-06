@@ -92,13 +92,3 @@
 .annotation-list-popup__panel {
   color: var(--reader-color, #ffffff);
 }
-
-.annotation-list-popup__item {
-  background: var(--reader-surface-raised, rgba(0, 0, 0, 0.85));
-  transition: background-color 0.24s ease, color 0.24s ease;
-}
-
-.annotation-list-popup__close {
-  background: var(--reader-surface-muted, rgba(255, 255, 255, 0.15));
-  color: var(--reader-color, #ffffff);
-}

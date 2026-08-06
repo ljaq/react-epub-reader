@@ -365,24 +365,12 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 字重选择弹层 */
-.font-weight-popup-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 10001;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
+/* 字重选择弹层 — 布局/定位由 BottomSheet 统一管理 */
 .font-weight-popup {
   width: 100%;
-  max-width: 480px;
   padding: 8px 20px 48px;
-  background: #ffffff;
-  color: #1a1a1a;
-  border-radius: 16px 16px 0 0;
+  background: var(--reader-surface, #ffffff);
+  color: var(--reader-color, #1a1a1a);
   box-sizing: border-box;
 }
 
@@ -507,10 +495,6 @@
 .font-panel__size-btn,
 .settings-panel__eye-care {
   color: var(--reader-accent, var(--reader-color, #1a1a1a));
-}
-
-.font-weight-popup-mask {
-  background: var(--reader-overlay, rgba(0, 0, 0, 0.45));
 }
 
 @media (prefers-reduced-motion: reduce) {
