@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
+    "page-flip": "^2.0.7",
     "zustand": "^5.0.14"
   },
   "peerDependencies": {

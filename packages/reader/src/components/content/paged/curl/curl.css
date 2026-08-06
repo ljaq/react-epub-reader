@@ -1,0 +1,39 @@
+/**
+ * 仿真翻页（curl）样式 — phase-14 新增。
+ *
+ * - 双阴影元素：绝对定位渐变带，几何参数（width/height/transform/transform-origin/
+ *   background/clip-path）全部由 useCurlMotionBridge 命令式逐帧写入，本文件只负责
+ *   定位/层叠/性能提示；默认 display:none（桥接写入时置 block）。
+ * - 翻页页 transform-origin 必须为 0 0（render-style 的 translate+rotate 数学
+ *   以元素左上角为原点推导）；clip-path 每帧重算，参与元素仅 2 页 + 2 阴影。
+ * - 层叠约定（PagedReader 内联 z-index）：本体平铺 1 / 下一页显露区 2 /
+ *   翻页页（flap 克隆）3 / 提交落幕遮盖 4 / 双阴影 5
+ *   （对齐 page-flip HTMLRender：阴影压在所有页层之上）。
+ */
+
+.reader-content--curl .paged-reader__page {
+  transform-origin: 0 0;
+  will-change: transform, clip-path;
+}
+
+.paged-reader__curl-shadow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+  pointer-events: none;
+  will-change: transform, clip-path;
+}
+
+/* 纸张背面半透明罩：盖在 flap 克隆内容之上，随 flap 元素一同反射/裁剪。
+   纸色（--reader-bg）半透 → 背面文字呈"透过纸张"的弱化反向效果。
+   不透明度由桥接经 --curl-tint 逐帧写入（prev 铺入为正面，置 0）。 */
+.paged-reader__curl-backface-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--reader-bg);
+  opacity: var(--curl-tint, 0.55);
+  transition: opacity 0.12s linear;
+  pointer-events: none;
+}

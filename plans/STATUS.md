@@ -16,6 +16,7 @@
 | 9 收尾验收 | I | ✅ done | 富媒体 overlays / book-css 接入 / 随感 h5-demo 1:1 / 插槽文档 / README / 162 tests / 视觉以 Vue SCSS+smoke 替代 PNG |
 | 10 真分页与覆盖翻页 | 总架构师 | ✅ done | 掌阅级覆盖模式 / PageSurface 抽象 / 克隆页 / 两阶段跨章转正 / flipMode 四档迁移 / 动画期缓冲锁 |
 | 11 性能与物理翻页 | 总架构师 | ✅ done | 拖拽热路径旁路 React（命令式 transform + rAF 合帧）/ 弹簧积分器 + fling / LRU HTML 缓存 + 布尔选择器 / 207 tests / 满帧 60fps / 覆盖模式长按选区修复 |
+| 14 仿真翻页 | 总架构师 | ✅ done | 方案 B 自研 CurlRender / 几何核与 page-flip 原版逐位对拍（14 组 oracle）/ dragPoint 二维跟手 + 折角点路径弹簧 / 双阴影层叠 / 首末页阻尼折角 / 设置四档全解锁 / 255 tests 全绿 |
 
 ## 契约裁定记录
 
@@ -79,9 +80,10 @@
 
 ## 迁移终态
 
-**Phase 0–11 全部 done。** Vue 阅读器 → React monorepo 1:1 复刻主链路闭环，性能/手感达第一梯队。
+**Phase 0–11、14 全部 done。** Vue 阅读器 → React monorepo 1:1 复刻主链路闭环，性能/手感达第一梯队；仿真翻页（方案 B 自研）已接通。
 
 Post-migration backlog：
 - EPUB 标注 CFI、BookMeta.cssLists typed、Playwright 视觉回归、epub-host 懒加载、reader code-split
 - 跨章提交瞬间卡顿（~60–230ms）：页容器池化复用/WW 预解析/克隆时机后移等（详见 Phase 11 plan）
-- 仿真翻页（page-flip）：PageSurface 抽象已铺路，待实现
+- 仿真翻页 T7 增强（可选）：翻过半程"页背面"层（镜像+纸张色罩）、桌面端页角悬停折角预览
+- 存量：`useReadingPositionReporter.ts` tsc TS2322（number vs Timeout，非本期引入）

@@ -51,6 +51,12 @@ interface ReadingState {
    * 读取后即复位（消费型字段，勿用于渲染订阅）。
    */
   dragReleaseVelocity: number
+  /**
+   * 仿真翻页二维跟手触点（viewport 相对坐标，phase-14）：
+   * pointerdown 记起点、x 轴锁定后每 move 更新、松手置 null。
+   * 与 dragOffset 同级高频字段，仅由 curl 运动桥接 vanilla subscribe 消费，不进 React state。
+   */
+  dragPoint: { x: number; y: number } | null
   isRebalancing: boolean
   layoutLocked: boolean
   /** 拖拽 + 翻页动画期间为 true，用于翻页阴影显隐 */
@@ -90,6 +96,7 @@ interface ReadingState {
   setDragOffset: (offset: number) => void
   setDragStartX: (x: number) => void
   setDragReleaseVelocity: (v: number) => void
+  setDragPoint: (p: { x: number; y: number } | null) => void
   setRebalancing: (value: boolean) => void
   setLayoutLocked: (value: boolean) => void
   setFlipping: (value: boolean) => void
@@ -134,6 +141,7 @@ export const useReadingStore = create<ReadingState>(set => ({
   dragOffset: 0,
   dragStartX: 0,
   dragReleaseVelocity: 0,
+  dragPoint: null,
   isRebalancing: false,
   layoutLocked: false,
   isFlipping: false,
@@ -184,6 +192,7 @@ export const useReadingStore = create<ReadingState>(set => ({
   setDragOffset: offset => set({ dragOffset: offset }),
   setDragStartX: x => set({ dragStartX: Math.max(0, Number(x) || 0) }),
   setDragReleaseVelocity: v => set({ dragReleaseVelocity: Number(v) || 0 }),
+  setDragPoint: p => set({ dragPoint: p }),
   setRebalancing: value => set({ isRebalancing: value }),
   setLayoutLocked: value => set({ layoutLocked: value }),
   setFlipping: value => set({ isFlipping: value }),
@@ -268,3 +277,8 @@ export const useReadingStore = create<ReadingState>(set => ({
 
 export type { BufferSegment, ChapterBuffer }
 export { rebuildSegmentOffsets }
+
+// 临时调试探针（验证后移除）
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __readingStore?: typeof useReadingStore }).__readingStore = useReadingStore
+}

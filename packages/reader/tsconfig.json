@@ -3,7 +3,10 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.reader.tsbuildinfo",
     "types": ["vite/client"],
-    "allowArbitraryExtensions": true
+    "allowArbitraryExtensions": true,
+    "paths": {
+      "page-flip/src/*": ["./src/page-flip-src-stub.d.ts"]
+    }
   },
   "include": ["src"]
 }

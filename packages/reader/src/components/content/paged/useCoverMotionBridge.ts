@@ -44,6 +44,8 @@ export interface CoverDragSession {
 }
 
 export interface UseCoverMotionBridgeInput {
+  /** false 时（仿真模式）不订阅 store，与 useCurlMotionBridge 互不抢写（phase-14） */
+  enabled?: boolean
   /** 当前页容器根 ref（规范流本体所在 PageSurfaceView） */
   currentRootRef: RefObject<HTMLDivElement | null>
   /** 克隆页容器根 ref（相邻页克隆 PageSurfaceView，未挂载时为 null） */
@@ -73,7 +75,7 @@ export interface CoverMotionBridge {
 }
 
 export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMotionBridge {
-  const { currentRootRef, cloneRootRef, onDragSessionChange, onSpringSettleInterrupted } = input
+  const { enabled = true, currentRootRef, cloneRootRef, onDragSessionChange, onSpringSettleInterrupted } = input
   const callbacksRef = useRef({ onDragSessionChange, onSpringSettleInterrupted })
   callbacksRef.current = { onDragSessionChange, onSpringSettleInterrupted }
 
@@ -123,6 +125,7 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
   }
 
   useEffect(() => {
+    if (!enabled) return undefined
     const batcher = batcherRef.current!
 
     const applyFrame = (): void => {
@@ -218,7 +221,7 @@ export function useCoverMotionBridge(input: UseCoverMotionBridgeInput): CoverMot
       cancelSpring()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [enabled])
 
   return {
     playSpring: ({ which, fromX, targetX, velocity = 0, onComplete, direction }) => {

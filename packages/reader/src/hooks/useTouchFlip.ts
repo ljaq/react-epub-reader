@@ -66,6 +66,7 @@ export function useTouchFlip(input: UseTouchFlipInput): {
   const setDragOffset = useReadingStore((s) => s.setDragOffset)
   const setDragStartX = useReadingStore((s) => s.setDragStartX)
   const setDragReleaseVelocity = useReadingStore((s) => s.setDragReleaseVelocity)
+  const setDragPoint = useReadingStore((s) => s.setDragPoint)
   const setGlobalPageIndex = useReadingStore((s) => s.setGlobalPageIndex)
   const setFlipping = useReadingStore((s) => s.setFlipping)
   const toggleUi = useUiStore((s) => s.toggleUi)
@@ -83,6 +84,11 @@ export function useTouchFlip(input: UseTouchFlipInput): {
   const flipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** 速度采样（t=timeStamp ms, x=clientX）：松手前 ~100ms 窗口 */
   const samplesRef = useRef<{ t: number; x: number }[]>([])
+  /**
+   * viewport 原点（pointerdown 时捕获，phase-14 仿真翻页）：
+   * 拖拽期间 viewport 不会移动，避免每 move 强制同步布局读 getBoundingClientRect。
+   */
+  const viewportOriginRef = useRef<{ left: number; top: number } | null>(null)
 
   const pushSample = useCallback((t: number, x: number) => {
     const samples = samplesRef.current
@@ -162,6 +168,8 @@ export function useTouchFlip(input: UseTouchFlipInput): {
     // 覆写回调先执行（其 fromX 捕获需读 dragStartX），随后复位手势起点。
     const handled = onTurnPageRef.current?.(action, lastDxRef.current) ?? false
     setDragStartX(0)
+    setDragPoint(null)
+    viewportOriginRef.current = null
     if (handled) {
       return
     }
@@ -182,7 +190,7 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       // 若期间又开始新拖拽，保持 true
       if (!draggingRef.current) setFlipping(false)
     }, 650)
-  }, [turnPage, setDragOffset, setDragStartX, setDragReleaseVelocity, computeReleaseVelocity, markRecentlyDragged, setFlipping])
+  }, [turnPage, setDragOffset, setDragStartX, setDragReleaseVelocity, setDragPoint, computeReleaseVelocity, markRecentlyDragged, setFlipping])
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -203,10 +211,14 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       movedRef.current = false
       draggingRef.current = true
       samplesRef.current = [{ t: e.timeStamp, x: e.clientX }]
+      // 仿真翻页：记录按下点（viewport 相对坐标）作为折角起点/角部判定依据
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      viewportOriginRef.current = { left: rect.left, top: rect.top }
+      setDragPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top })
       setDragOffset(0)
       setDragStartX(e.clientX)
     },
-    [enabled, shouldBlock, setDragOffset, setDragStartX]
+    [enabled, shouldBlock, setDragOffset, setDragStartX, setDragPoint]
   )
 
   const onPointerMove = useCallback(
@@ -232,9 +244,15 @@ export function useTouchFlip(input: UseTouchFlipInput): {
       movedRef.current = true
       lastDxRef.current = dx
       pushSample(e.timeStamp, e.clientX)
+      // 仿真翻页：x 轴锁定后触点即折角点（二维跟手）；先于 dragOffset 写入，
+      // 保证桥接 rAF 帧读取到同一点位
+      const origin = viewportOriginRef.current
+      if (origin) {
+        setDragPoint({ x: e.clientX - origin.left, y: e.clientY - origin.top })
+      }
       updateDragOffset(dx)
     },
-    [enabled, updateDragOffset, setFlipping, pushSample]
+    [enabled, updateDragOffset, setFlipping, pushSample, setDragPoint]
   )
 
   const onPointerUp = useCallback(

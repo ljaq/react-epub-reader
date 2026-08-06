@@ -1,7 +1,7 @@
 /**
  * 设置面板 — 源码对照 old-vue-reader/components/SettingsPanel/index.vue。
  * 亮度 / 护眼 / 四主题 / 行距 / 翻页方式 → settings-store。
- * 翻页方式四档（phase-10）：覆盖 / 平移 / 上下滚动 / 仿真（置灰占位，敬请期待）。
+ * 翻页方式四档（phase-14）：覆盖 / 平移 / 上下滚动 / 仿真（已全部可选）。
  * 翻页方式切换需中断 TTS（Phase 6 接，此处留 hook 注释）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -36,12 +36,12 @@ const SPACING_OPTIONS: { value: SpacingKey; label: string; lines: number }[] = [
   { value: 'loose', label: '松', lines: 2 }
 ]
 
-/** 翻页模式四档（phase-10）：覆盖 / 平移 / 上下滚动 / 仿真（置灰占位，敬请期待） */
+/** 翻页模式四档（phase-14 起全部可选）：覆盖 / 平移 / 上下滚动 / 仿真 */
 const FLIP_MODE_OPTIONS: { value: FlipMode; label: string; disabled?: boolean }[] = [
   { value: 'cover', label: '覆盖' },
   { value: 'slide', label: '平移' },
   { value: 'vertical', label: '上下滚动' },
-  { value: 'simulation', label: '仿真', disabled: true }
+  { value: 'simulation', label: '仿真' }
 ]
 
 function getClientX(event: MouseEvent | TouchEvent): number | null {
@@ -177,7 +177,6 @@ export function SettingsPanel(): React.ReactNode {
   }
 
   const setFlipMode = (value: FlipMode) => {
-    if (value === 'simulation') return
     if (settings.flipMode === value) return
     if (isTtsActivelyPlaying()) {
       window.alert('切换翻页方式将中断语音朗读')

@@ -25,6 +25,15 @@
  * - 补间动画为物理弹簧（core/motion）：松手带初速度、可打断落定；
  * - React 只承担低频结构渲染：克隆挂载/销毁（dragSession）、z 序换层、阴影 class、
  *   弹簧启停（animState，每次翻页 2-3 次 render）。
+ *
+ * phase-14 仿真翻页（mode='simulation'）：
+ * - 与 cover 同构复用：克隆生命周期 / 提交判定（dx 阈值+fling）/ 两阶段转正 /
+ *   动画期缓冲锁全部不变；仅跟手渲染换为 useCurlMotionBridge（折角跟手 +
+ *   双阴影 + 折角点路径弹簧），双桥经 enabled 互斥不抢写；
+ * - 层叠约定（三元素模型，page-flip portrait 同构）：本体平铺 z=1 /
+ *   下一页显露区（主克隆）z=2 / 翻页页（flap 克隆）z=3 / 双阴影 z=5 /
+ *   提交落幕遮盖 z=4；
+ * - 首末页无相邻页：当前页小幅阻尼折角 + 弹簧回弹（progress 封顶 15%）。
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { unstable_batchedUpdates } from 'react-dom'
@@ -45,6 +54,14 @@ import {
   type CoverDirection
 } from '../../../core/flip'
 import { resolveAdjacentPageSurface, resolvePageSurface, type PageSurface } from '../../../core/pages'
+import {
+  getCurlClickStartPoint,
+  getCurlCommitPoint,
+  getCurlRestPoint,
+  type CurlCorner,
+  type CurlDirection,
+  type CurlPoint
+} from '../../../core/curl'
 import { useReadingStore } from '../../../store/reading-store'
 import { useTouchFlip } from '../../../hooks/useTouchFlip'
 import { usePagination } from '../../../hooks/usePagination'
@@ -60,8 +77,14 @@ import {
   type CoverDragSession,
   type CoverMotionBridge
 } from './useCoverMotionBridge'
+import {
+  useCurlMotionBridge,
+  type CurlDragSession,
+  type CurlMotionBridge
+} from './curl/useCurlMotionBridge'
 import '../reader-content.css'
 import './paged-reader.css'
+import './curl/curl.css'
 
 /** 覆盖弹簧动画状态（低频：每次翻页仅启动/落幕两次 setState，跟手帧不进 state） */
 interface CoverAnimState {
@@ -73,6 +96,18 @@ interface CoverAnimState {
   /** 相邻页单元（克隆目标）；首末页阻尼回弹为 null */
   adjacent: PageSurface | null
 }
+
+/** 仿真翻页弹簧动画状态（phase-14）：折角点路径弹簧，其余语义与 CoverAnimState 同构 */
+interface CurlAnimState {
+  direction: CurlDirection
+  corner: CurlCorner
+  commit: boolean
+  /** 动画起点折角点（页坐标）：拖拽松手=当前跟手点；点击=页角内侧起点 */
+  from: CurlPoint
+  adjacent: PageSurface | null
+}
+
+type PagedAnimState = CoverAnimState | CurlAnimState
 
 export interface PagedReaderProps {
   chapterList: ChapterMeta[]
@@ -87,6 +122,8 @@ export interface PagedReaderProps {
   paidChapterStart?: number
   isLoggedIn?: boolean
   onLinkClick?: (href: string) => void
+  /** 翻页渲染模式：cover=覆盖（默认）；simulation=仿真翻页（phase-14） */
+  mode?: 'cover' | 'simulation'
 }
 
 export function PagedReader(props: PagedReaderProps): React.ReactNode {
@@ -102,12 +139,18 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
     registerScrollRoot,
     paidChapterStart,
     isLoggedIn = false,
-    onLinkClick
+    onLinkClick,
+    mode = 'cover'
   } = props
+
+  const isCurl = mode === 'simulation'
 
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const currentRootRef = useRef<HTMLDivElement | null>(null)
   const cloneRootRef = useRef<HTMLDivElement | null>(null)
+  const flapCloneRootRef = useRef<HTMLDivElement | null>(null)
+  const curlOuterShadowRef = useRef<HTMLDivElement | null>(null)
+  const curlInnerShadowRef = useRef<HTMLDivElement | null>(null)
   const segmentBodyMapRef = useRef<Map<number, Element>>(new Map())
 
   const globalPageIndex = useReadingStore((s) => s.globalPageIndex)
@@ -124,11 +167,12 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
 
   // ── 低频结构状态 ──
   // 弹簧动画状态（启动/落幕各一次 setState）
-  const [animState, setAnimState] = useState<CoverAnimState | null>(null)
-  const animStateRef = useRef<CoverAnimState | null>(null)
+  const [animState, setAnimState] = useState<PagedAnimState | null>(null)
+  const animStateRef = useRef<PagedAnimState | null>(null)
   animStateRef.current = animState
   // 拖拽会话（方向/相邻页，桥接回调驱动；开始/换向/结束各一次 setState）
-  const [dragSession, setDragSession] = useState<CoverDragSession | null>(null)
+  const [dragSession, setDragSession] = useState<CoverDragSession | CurlDragSession | null>(null)
+  const dragSessionRef = useRef<CoverDragSession | CurlDragSession | null>(null)
   // 提交落幕后克隆层继续盖住新规范流，待 body 挂载 + applyMarks 后撤下（两阶段转正）
   const [settlingClone, setSettlingClone] = useState(false)
   const settlingCloneRef = useRef(false)
@@ -138,7 +182,16 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
     return segmentBodyMapRef.current.get(Number(id)) ?? null
   }, [])
 
-  const { activeClone, cloneHostRef, showClone, clearClone } = usePageClones({ getSegmentBody })
+  const {
+    activeClone,
+    cloneHostRef,
+    showClone,
+    clearClone,
+    activeFlapClone,
+    flapCloneHostRef,
+    showFlapClone,
+    clearFlapClone
+  } = usePageClones({ getSegmentBody })
 
   const { runInitialLayout, getFetchWidth } = usePagination({
     enabled: true,
@@ -159,9 +212,13 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
     // Preserve original order: React state first, then zustand actions.
     unstable_batchedUpdates(() => {
       setDragSession(null)
+      dragSessionRef.current = null
       if (anim.commit) {
         // 两阶段转正：先提交页码（新章/新页规范流挂载），克隆层留顶遮盖，
-        // 由 settlingClone effect 在 marks ready 后撤下
+        // 由 settlingClone effect 在 marks ready 后撤下。
+        // 仿真模式 prev 拖拽期间主槽未挂克隆，此处补齐转正遮盖（幂等）
+        if (anim.adjacent) showClone(anim.adjacent)
+        clearFlapClone()
         state.setGlobalPageIndex(state.globalPageIndex + anim.direction)
         setSettlingClone(true)
         setAnimState(null)
@@ -173,6 +230,7 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
       } else {
         setAnimState(null)
         clearClone()
+        clearFlapClone()
         state.setDragOffset(0)
         state.setFlipAnimating(false)
         state.setFlipping(false)
@@ -181,27 +239,49 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
         }
       }
     })
-  }, [clearClone])
+  }, [clearClone, clearFlapClone, showClone])
 
   // 拖拽会话变化（桥接回调）：克隆挂载/销毁 + 打断转正遮盖收尾
   const handleDragSessionChange = useCallback(
-    (session: CoverDragSession | null) => {
+    (session: CoverDragSession | CurlDragSession | null) => {
       setDragSession(session)
+      dragSessionRef.current = session
       if (session === null) {
-        if (!settlingCloneRef.current) clearClone()
+        if (!settlingCloneRef.current) {
+          clearClone()
+          clearFlapClone()
+        }
         return
       }
       if (settlingCloneRef.current) {
         // 新拖拽打断转正遮盖收尾：取消待执行的撤克隆，避免误删新拖拽的克隆
         setSettlingClone(false)
       }
+      if (isCurl && 'corner' in session) {
+        // 仿真三元素模型（page-flip portrait 同构）：
+        // next：主槽=下一页（底层显露 clip），flap 槽=当前页折角副本；
+        // prev：flap 槽=上一页铺入（主槽闲时清空）；首末页阻尼：flap 槽=当前页副本
+        const state = useReadingStore.getState()
+        const current = resolvePageSurface(state.globalPageIndex, state.buffer)
+        if (session.direction === 1) {
+          if (session.adjacent) showClone(session.adjacent)
+          else clearClone()
+          if (current) showFlapClone(current)
+        } else {
+          clearClone()
+          const flap = session.adjacent ?? current
+          if (flap) showFlapClone(flap)
+        }
+        return
+      }
       if (session.adjacent) showClone(session.adjacent)
       else clearClone()
     },
-    [showClone, clearClone]
+    [isCurl, showClone, clearClone, showFlapClone, clearFlapClone]
   )
 
   const bridge = useCoverMotionBridge({
+    enabled: !isCurl,
     currentRootRef,
     cloneRootRef,
     onDragSessionChange: handleDragSessionChange,
@@ -209,6 +289,20 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
   })
   const bridgeRef = useRef<CoverMotionBridge>(bridge)
   bridgeRef.current = bridge
+
+  // 仿真翻页桥接（phase-14）：与 cover 桥接互斥启用（enabled 门控，双桥不抢写）
+  const curlBridge = useCurlMotionBridge({
+    enabled: isCurl,
+    currentRootRef,
+    cloneRootRef,
+    flapCloneRootRef,
+    outerShadowRef: curlOuterShadowRef,
+    innerShadowRef: curlInnerShadowRef,
+    onDragSessionChange: handleDragSessionChange,
+    onSpringSettleInterrupted: finalizeAnim
+  })
+  const curlBridgeRef = useRef<CurlMotionBridge>(curlBridge)
+  curlBridgeRef.current = curlBridge
 
   // 启动弹簧补间：fromX 起步（速度连续），目标位由 commit/direction 决定
   const startAnim = useCallback(
@@ -245,21 +339,107 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
     [showClone, finalizeAnim]
   )
 
-  // useTouchFlip 覆写点：拖拽松手判定与点击分区翻页 → 覆盖动画提交/回弹
+  // 仿真翻页：启动折角点路径弹簧（起点 from 速度连续，目标 = commit/rest 折角点）
+  const startCurlAnim = useCallback(
+    (anim: CurlAnimState) => {
+      const state = useReadingStore.getState()
+      const w = state.pageStride
+      const h = currentRootRef.current?.clientHeight ?? 0
+      if (w <= 0 || h <= 0) return
+      state.setFlipAnimating(true)
+      // 复位拖拽残留位移：from 已捕获松手折角点，补间由 animState + 弹簧驱动
+      state.setDragOffset(0)
+      // 克隆槽位（点击路径在此挂载；拖拽路径已被会话回调挂载，此处幂等）：
+      // next：主槽=下一页 + flap=当前页副本；prev：flap=上一页；首末页：flap=当前页副本
+      const current = resolvePageSurface(state.globalPageIndex, state.buffer)
+      if (anim.direction === 1) {
+        if (anim.adjacent) showClone(anim.adjacent)
+        if (current) showFlapClone(current)
+      } else {
+        const flap = anim.adjacent ?? current
+        if (flap) showFlapClone(flap)
+      }
+      setAnimState(anim)
+      // 消费松手速度（px/ms）作为弹簧初速度（桥接内投影到路径参数 t），读取后复位
+      const velocity = state.dragReleaseVelocity
+      if (velocity !== 0) state.setDragReleaseVelocity(0)
+      curlBridgeRef.current.playSpring({
+        direction: anim.direction,
+        corner: anim.corner,
+        from: anim.from,
+        to: anim.commit
+          ? getCurlCommitPoint(anim.corner, w, h)
+          : getCurlRestPoint(anim.corner, w, h),
+        velocity,
+        hasAdjacent: anim.adjacent !== null,
+        onComplete: finalizeAnim
+      })
+    },
+    [showClone, showFlapClone, finalizeAnim]
+  )
+
+  // useTouchFlip 覆写点：拖拽松手判定与点击分区翻页 → 覆盖/仿真动画提交回弹
   const handleTurnPage = useCallback(
     (action: DragTurnResult, lastDx: number): boolean => {
       // 快速连滑/连点：弹簧未落幕又来新提交 → 取消弹簧并无动画落定，再处理新提交
       if (animStateRef.current) {
         bridgeRef.current.cancelSpring()
+        curlBridgeRef.current.cancelSpring()
         finalizeAnim()
       }
       const state = useReadingStore.getState()
-      // 覆盖模式翻页距离 = page 宽 = pageStride（= pageWidth + pageGap = viewport clientWidth），
+      // 覆盖/仿真模式翻页距离 = page 宽 = pageStride（= pageWidth + pageGap = viewport clientWidth），
       // 与 startAnim 同步：page 撑满屏幕后，page 滑出/滑入距离必须 = page 宽才能完全离开屏幕。
       const pw = state.pageStride
       if (pw <= 0) return false
       const current = resolvePageSurface(state.globalPageIndex, state.buffer)
       if (!current) return false
+
+      // ── 仿真翻页（phase-14）：提交判定与覆盖同源（dx 阈值 + fling），
+      //    提交/回弹 = 折角点路径弹簧；首末页 = 阻尼折角回弹 ──
+      if (isCurl) {
+        const session = dragSessionRef.current
+        const sessionCorner: CurlCorner =
+          session && 'corner' in session ? session.corner : 'bottom'
+        if (action === 'stay') {
+          // 未过阈值回弹；无位移（理论不可达）走默认收尾
+          if (state.dragOffset === 0) return false
+          const direction: CurlDirection = state.dragOffset < 0 ? 1 : -1
+          const adjacent = resolveAdjacentPageSurface(current, direction, state.buffer)
+          const from =
+            curlBridgeRef.current.getCurrentPoint() ??
+            getCurlRestPoint(sessionCorner, pw, currentRootRef.current?.clientHeight ?? 0)
+          startCurlAnim({ direction, corner: sessionCorner, commit: false, from, adjacent })
+          return true
+        }
+        const direction: CurlDirection = action === 'next-page' ? 1 : -1
+        const adjacent = resolveAdjacentPageSurface(current, direction, state.buffer)
+        if (!adjacent) {
+          // 首末页：点击边界 → 默认 turnPage 边界钳制 no-op
+          // （拖拽越界由 resolveGlobalDragTurn 判 stay，走上方回弹分支）
+          return false
+        }
+        if (lastDx !== 0) {
+          // 拖拽提交：从松手折角点继续飞出（速度连续）
+          const from =
+            curlBridgeRef.current.getCurrentPoint() ??
+            getCurlRestPoint(sessionCorner, pw, currentRootRef.current?.clientHeight ?? 0)
+          startCurlAnim({ direction, corner: sessionCorner, commit: true, from, adjacent })
+          return true
+        }
+        // 点击 20%/80% 分区：从页角内侧起播放完整翻页动画（page-flip flip() 同款）
+        const h = currentRootRef.current?.clientHeight ?? 0
+        if (h <= 0) return false
+        const corner: CurlCorner = 'bottom'
+        startCurlAnim({
+          direction,
+          corner,
+          commit: true,
+          from: getCurlClickStartPoint(direction, corner, pw, h),
+          adjacent
+        })
+        return true
+      }
 
       if (action === 'stay') {
         // 未过阈值回弹；无位移（理论不可达）走默认收尾
@@ -297,7 +477,7 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
       startAnim({ direction, commit: true, fromX, adjacent })
       return true
     },
-    [startAnim, finalizeAnim]
+    [isCurl, startAnim, startCurlAnim, finalizeAnim]
   )
 
   const { handlers: dragHandlers, onClick } = useTouchFlip({
@@ -474,7 +654,7 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
 
   return (
     <div
-      className={`reader-content reader-content--horizontal reader-content--paged${bootOverlayVisible ? ' reader-content--chapter-loading' : ''}`}
+      className={`reader-content reader-content--horizontal reader-content--paged${isCurl ? ' reader-content--curl' : ''}${bootOverlayVisible ? ' reader-content--chapter-loading' : ''}`}
       style={rootStyle}
       onClick={handleContentClick}
       onTouchMove={hideFootnoteOnTouchMove}
@@ -511,11 +691,12 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
             ))}
         </div>
 
-        {/* 相邻页克隆层（短命）：next=底层静止 / prev=顶层滑入 / 提交落幕遮盖转正 */}
+        {/* 相邻页克隆层（短命）：cover：next=底层静止 / prev=顶层滑入 / 提交落幕遮盖转正；
+            curl：next=下一页显露区（z=2）/ 提交落幕遮盖（z=4） */}
         {cloneVisible && activeClone && (
           <PageSurfaceView
-            zIndex={cloneOnTop ? 2 : 1}
-            moving={!currentIsMoving && showMovingShadow}
+            zIndex={isCurl ? (settling ? 4 : 2) : cloneOnTop ? 2 : 1}
+            moving={!isCurl && !currentIsMoving && showMovingShadow}
             sliceTranslateX={-activeClone.localPageIndex * pageStride}
             pageWidth={pageWidth}
             pageStride={pageStride}
@@ -524,10 +705,11 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
           />
         )}
 
-        {/* 当前页容器：规范流本体（划线/批注/选区/跳转唯一作用对象） */}
+        {/* 当前页容器：规范流本体（划线/批注/选区/跳转唯一作用对象）。
+            curl 模式恒为平铺底层（z=1），不参与变换，clip 零残留 */}
         <PageSurfaceView
-          zIndex={cloneOnTop ? 1 : 2}
-          moving={currentIsMoving && showMovingShadow}
+          zIndex={isCurl ? 1 : cloneOnTop ? 1 : 2}
+          moving={!isCurl && currentIsMoving && showMovingShadow}
           sliceTranslateX={-localPageIndex * pageStride}
           pageWidth={pageWidth}
           pageStride={pageStride}
@@ -543,6 +725,39 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
             registerSegmentBody={registerSegmentBody}
           />
         </PageSurfaceView>
+
+        {/* 仿真翻页 flap 克隆层（phase-14）：next=当前页折角副本 / prev=上一页铺入，
+            z=3 压在 本体(1) 与下一页显露区(2) 之上 */}
+        {isCurl && activeFlapClone && (
+          <PageSurfaceView
+            zIndex={3}
+            moving={false}
+            sliceTranslateX={-activeFlapClone.localPageIndex * pageStride}
+            pageWidth={pageWidth}
+            pageStride={pageStride}
+            cloneHostRef={flapCloneHostRef}
+            rootRef={flapCloneRootRef}
+            curlFlap
+          />
+        )}
+
+        {/* 仿真翻页双阴影（phase-14）：outer 投在底层显露页上，inner 投在翻页页
+            折痕内侧；均压在所有页层之上（对齐 page-flip z 约定）；
+            几何参数由 useCurlMotionBridge 逐帧命令式写入 */}
+        {isCurl && (
+          <>
+            <div
+              ref={curlOuterShadowRef}
+              className="paged-reader__curl-shadow"
+              style={{ zIndex: 5 }}
+            />
+            <div
+              ref={curlInnerShadowRef}
+              className="paged-reader__curl-shadow"
+              style={{ zIndex: 5 }}
+            />
+          </>
+        )}
 
         {atBookStart && flags.hasPrev && (
           <div

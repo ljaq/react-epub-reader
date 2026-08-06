@@ -34,6 +34,8 @@ export interface PageSurfaceViewProps {
   cloneHostRef?: RefObject<HTMLDivElement | null>
   /** 页容器根元素 ref：运动桥接命令式写入 transform 的触点 */
   rootRef?: RefObject<HTMLDivElement | null>
+  /** 仿真翻页 flap 槽（phase-14）：挂纸张背面半透明罩层（随元素一同反射/裁剪） */
+  curlFlap?: boolean
   children?: ReactNode
 }
 
@@ -47,6 +49,7 @@ export const PageSurfaceView = memo(function PageSurfaceView(props: PageSurfaceV
     segmentId,
     cloneHostRef,
     rootRef,
+    curlFlap = false,
     children
   } = props
 
@@ -72,6 +75,9 @@ export const PageSurfaceView = memo(function PageSurfaceView(props: PageSurfaceV
       </div>
       {/* phase-13 视差翻页：静态页黑色半透明遮罩，opacity 由 --cover-overlay 控制 */}
       <div className="paged-reader__page-overlay" />
+      {/* phase-14 仿真翻页：flap 纸张背面半透明罩（纸色，模拟背面透光/反向文字弱化；
+          不透明度由桥接经 --curl-tint 按方向控制，prev 铺入为正面置 0） */}
+      {curlFlap && <div className="paged-reader__curl-backface-tint" />}
     </div>
   )
 })

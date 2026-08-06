@@ -4,7 +4,8 @@
  * - cover：PagedReader（掌阅级覆盖翻页，真分页页式结构）
  * - slide：HorizontalReader（整轨横滑，老用户默认，行为零改动）
  * - vertical：VerticalReader（上下滚动，行为零改动）
- * - simulation：仿真翻页预留（设置面板置灰不可选；persist 万一落入按 cover 渲染）
+ * - simulation：仿真翻页（phase-14，PagedReader mode='simulation'；
+ *   clip-path 探测不通过时回退 cover 渲染）
  *
  * horizontalEnabled 为 flipMode 派生字段（非竖滚即横排），下游消费方零改动。
  *
@@ -39,6 +40,15 @@ import { ReadLoginTip } from '../overlays/ReadLoginTip/ReadLoginTip'
 import { HorizontalReader } from './HorizontalReader'
 import { VerticalReader } from './VerticalReader'
 import { PagedReader } from './paged/PagedReader'
+
+/**
+ * 仿真翻页 clip-path 探测（phase-14）：polygon() 现代浏览器全支持，
+ * 不支持的极端环境回退 cover 渲染（模块加载期一次性求值）。
+ */
+const curlSupported =
+  typeof CSS === 'undefined' ||
+  typeof CSS.supports !== 'function' ||
+  CSS.supports('clip-path', 'polygon(0 0, 1px 0, 0 1px)')
 
 export interface ReaderContentProps {
   bookId: number
@@ -290,6 +300,7 @@ export function ReaderContent(props: ReaderContentProps): React.ReactNode {
           paidChapterStart={paidChapterStart}
           isLoggedIn={isLoggedIn}
           onLinkClick={onLinkClick}
+          mode={flipMode === 'simulation' && curlSupported ? 'simulation' : 'cover'}
         />
       ) : (
         <VerticalReader
