@@ -36,12 +36,20 @@ import {
 } from '../../../../core/curl'
 import {
   buildBottomPageClipPath,
+  buildCreaseShadowStyle,
   buildFlippingBackFaceStyle,
   buildFlippingPageStyle,
   buildInnerShadowStyle,
   buildOuterShadowStyle,
   type CurlShadowStyle
 } from '../../../../core/curl/render-style'
+import {
+  buildStraightBottomClip,
+  buildStraightFlapStyle,
+  buildStraightShadowStyle,
+  computeStraightFold,
+  type StraightShadowStyle
+} from '../../../../core/curl/straight-fold'
 import { createSpringAnimation, type SpringAnimation } from '../../../../core/motion'
 import {
   resolveAdjacentPageSurface,
@@ -51,14 +59,29 @@ import {
 import { createRafBatcher } from '../../../../hooks/raf-batcher'
 import { useReadingStore } from '../../../../store/reading-store'
 
-/** 弹簧路径参数 t 的初速度上限（t/ms）：极端甩动全路径 ≥50ms，动画可读 */
-const MAX_SPRING_T_VELOCITY = 0.02
+/** 弹簧路径参数 t 的初速度上限（t/ms）：限制极端甩动的初速度，保证慢速动画全程可读 */
+const MAX_SPRING_T_VELOCITY = 0.006
+/** 直线折痕 spring（fingerX，px 空间）的初速度上限（px/ms） */
+const MAX_SPRING_PX_VELOCITY = 3
+
+/**
+ * 仿真翻页弹簧参数（独立于覆盖模式 PAGE_FLIP_SPRING）：
+ * 时长 ∝ 1/√stiffness —— 覆盖模式 ~370ms，本参数 → 约 3.5 倍时长（~1.3s），
+ * 阻尼比 ζ = damping/(2·√(stiffness·mass)) ≈ 0.88 保持几乎无过冲；
+ * 落定容差按 t 量程（0..1）覆盖（px 默认容差比 t 量程还大，会半途误判落定）；
+ * 硬超时相应放宽到 2500ms（默认 600ms 会把慢动画半途切断）。
+ */
+const CURL_FLIP_SPRING = { stiffness: 32, damping: 10, mass: 1 }
+const CURL_SPRING_SETTLE = { position: 0.002, velocity: 0.00005 }
+const CURL_SPRING_MAX_DURATION_MS = 2500
 
 /** 拖拽会话：方向 + 角部 + 相邻页单元；null 表示空闲（无拖拽无动画） */
 export interface CurlDragSession {
   direction: CurlDirection
   /** 折角所在书角（按下点 y 决定，整次拖拽固定） */
   corner: CurlCorner
+  /** 折叠模型：corner=对角折角（上下角起翻）；straight=竖直折痕（右侧中部起翻） */
+  kind: 'corner' | 'straight'
   adjacent: PageSurface | null
 }
 
@@ -71,10 +94,12 @@ export interface UseCurlMotionBridgeInput {
   cloneRootRef: RefObject<HTMLDivElement | null>
   /** flap 克隆页容器根 ref（翻页页：next=当前页折角副本 / prev=上一页铺入） */
   flapCloneRootRef: RefObject<HTMLDivElement | null>
-  /** 底层页外阴影元素 ref（投在底层页上） */
+  /** 底层页外阴影元素 ref（投在底层页上，折痕显露侧） */
   outerShadowRef: RefObject<HTMLDivElement | null>
   /** 翻页页内阴影元素 ref（折痕背光侧） */
   innerShadowRef: RefObject<HTMLDivElement | null>
+  /** 折痕淡阴影元素 ref（平铺页一侧，纸张拱起遮光的淡阴影） */
+  creaseShadowRef: RefObject<HTMLDivElement | null>
   /** 拖拽会话变化（开始/换向/相邻页变化/结束）——低频，驱动结构渲染 */
   onDragSessionChange: (session: CurlDragSession | null) => void
   /** 弹簧被新拖拽打断：PagedReader 执行 finalizeAnim 状态收尾（提交即完成/回弹即归位） */
@@ -84,10 +109,15 @@ export interface UseCurlMotionBridgeInput {
 export interface CurlPlaySpringInput {
   direction: CurlDirection
   corner: CurlCorner
-  /** 动画起点折角点（页坐标）：拖拽松手=当前跟手点；点击=页角内侧起点 */
-  from: CurlPoint
-  /** 动画终点折角点（页坐标）：提交=对侧 commit 点；回弹=静止位 rest 点 */
-  to: CurlPoint
+  /** 折叠模型：corner=对角折角（默认）；straight=竖直折痕（右侧中部起翻） */
+  kind?: 'corner' | 'straight'
+  /** 动画起点折角点（页坐标）：拖拽松手=当前跟手点；点击=页角内侧起点（corner 模型） */
+  from?: CurlPoint
+  /** 动画终点折角点（页坐标）：提交=对侧 commit 点；回弹=静止位 rest 点（corner 模型） */
+  to?: CurlPoint
+  /** 直线折痕模型：起点/终点 fingerX（px，页坐标；corner 模型忽略） */
+  fromX?: number
+  toX?: number
   /** 松手速度 viewport x 分量（px/ms；内部投影为 t 初速度并 clamp） */
   velocity?: number
   /** 是否有相邻页（首末页阻尼回弹为 false：翻页页=当前页、无底层页） */
@@ -111,6 +141,7 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
     flapCloneRootRef,
     outerShadowRef,
     innerShadowRef,
+    creaseShadowRef,
     onDragSessionChange,
     onSpringSettleInterrupted
   } = input
@@ -129,6 +160,8 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
   const retryRef = useRef(0)
   /** 本次拖拽的折角书角（按下点决定，跨换向保持） */
   const cornerRef = useRef<CurlCorner | null>(null)
+  /** 本次拖拽的折叠模型（按下点 y 决定，跨换向保持） */
+  const kindRef = useRef<'corner' | 'straight'>('corner')
   /** 最近一次成功渲染的折角点（页坐标） */
   const lastPointRef = useRef<CurlPoint | null>(null)
   /** 几何核缓存（参数变化才重建） */
@@ -158,13 +191,27 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
     return { w: s.pageStride, h }
   }
 
+  /**
+   * 对角折角模式阴影写入（旋转型 transform + transform-origin 锚定）。
+   * 注意：本函数从不写 .left/.top —— 位置完全由 transform 推导。
+   * 写非 null 时显式把 .left/.top 重置为 0（兜底防御），防止上一帧
+   * 直线折痕模式残留 .left 造成本帧阴影整体偏移。
+   * 写 null 时清空 transform/origin/background/clipPath，避免下一帧切到直线
+   * 模式被 transform-origin/clipPath 残留污染。
+   */
   const writeShadow = (el: HTMLDivElement | null, style: CurlShadowStyle | null): void => {
     if (!el) return
     if (!style || style.width <= 0) {
       el.style.display = 'none'
+      el.style.transform = ''
+      el.style.transformOrigin = ''
+      el.style.background = ''
+      el.style.clipPath = ''
       return
     }
     el.style.display = 'block'
+    el.style.left = '0'
+    el.style.top = '0'
     el.style.width = `${style.width}px`
     el.style.height = `${style.height}px`
     el.style.transform = style.transform
@@ -193,6 +240,71 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
     }
     writeShadow(outerShadowRef.current, null)
     writeShadow(innerShadowRef.current, null)
+    writeShadow(creaseShadowRef.current, null)
+  }
+
+  /**
+   * 直线折痕模式阴影写入（轴对齐渐变带，无旋转几何）。
+   * **关键**：本函数只写 transform + width + height + background，
+   * 绝不写 .left/.top/transform-origin —— 跨模式切换（直线 → 对角）
+   * 时 .left/.top/origin 不会被本函数污染；对角模式反过来也不会污染本函数。
+   * 此约束避免「中部翻页后再从两角翻页 → 折痕左侧阴影偏移」的 bug。
+   * 写 null 时清空 transform/origin/background/clipPath，避免影响下次对角模式渲染。
+   */
+  const writeStraightShadow = (
+    el: HTMLDivElement | null,
+    style: StraightShadowStyle | null
+  ): void => {
+    if (!el) return
+    if (!style || style.width <= 0) {
+      el.style.display = 'none'
+      el.style.transform = ''
+      el.style.transformOrigin = ''
+      el.style.background = ''
+      el.style.clipPath = ''
+      return
+    }
+    el.style.display = 'block'
+    // 用 transform 定位（与对角模式一致），轴对齐、无旋转
+    el.style.transform = `translate3d(${style.left.toFixed(2)}px, 0px, 0)`
+    el.style.transformOrigin = '0 0'
+    el.style.width = `${style.width.toFixed(2)}px`
+    el.style.height = `${style.height.toFixed(2)}px`
+    el.style.background = style.background
+    el.style.clipPath = 'none'
+  }
+
+  /**
+   * 直线折痕单帧渲染（仅 next；竖直折痕，flap 反射矩阵 + 轴对齐阴影带）。
+   * @returns 翻页页元素是否已挂载并完成写入（false 时调用方补帧重试）
+   */
+  const renderStraightFrame = (
+    fingerX: number,
+    w: number,
+    h: number,
+    hasAdjacent: boolean
+  ): boolean => {
+    const sf = computeStraightFold(fingerX, 1, w, h)
+    if (!sf) return true
+    lastPointRef.current = { x: fingerX, y: 0 }
+    const flippingEl = flapCloneRootRef.current
+    const bottomEl = hasAdjacent ? cloneRootRef.current : null
+    if (flippingEl) {
+      const st = buildStraightFlapStyle(sf)
+      flippingEl.style.transform = st.transform
+      flippingEl.style.clipPath = st.clipPath
+      // 背面（竖直镜像反向文字 + 纸色罩）
+      flippingEl.style.setProperty('--curl-tint', '0.55')
+    }
+    if (bottomEl) {
+      const clip = buildStraightBottomClip(sf)
+      if (clip) bottomEl.style.clipPath = clip
+      else bottomEl.style.removeProperty('clip-path')
+    }
+    writeStraightShadow(outerShadowRef.current, buildStraightShadowStyle(sf, 'outer'))
+    writeStraightShadow(creaseShadowRef.current, buildStraightShadowStyle(sf, 'crease'))
+    writeStraightShadow(innerShadowRef.current, buildStraightShadowStyle(sf, 'inner'))
+    return flippingEl !== null
   }
 
   /**
@@ -230,6 +342,7 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
     }
     writeShadow(outerShadowRef.current, buildOuterShadowStyle(frame, direction, w, h))
     writeShadow(innerShadowRef.current, buildInnerShadowStyle(frame, direction, w, h))
+    writeShadow(creaseShadowRef.current, buildCreaseShadowStyle(frame, direction, w, h))
     return flippingEl !== null
   }
 
@@ -260,6 +373,7 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
           clearAll()
           sessionKeyRef.current = null
           cornerRef.current = null
+          kindRef.current = 'corner'
           lastPointRef.current = null
           callbacksRef.current.onSpringSettleInterrupted()
         }
@@ -274,19 +388,33 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
         const { w, h } = size
         const direction: CurlDirection = s.dragOffset < 0 ? 1 : -1
         const adjacent = resolveAdjacentPageSurface(current, direction, s.buffer)
+        // 会话首帧：按按下点 y 决定折叠模型（next 中部=竖直折痕，其余=对角折角）
         if (sessionKeyRef.current === null || cornerRef.current === null) {
+          const midBand = Math.abs(s.dragPoint.y - h / 2) < h * 0.25
+          kindRef.current =
+            direction === 1 && midBand ? 'straight' : 'corner'
           cornerRef.current = resolveCurlCorner(s.dragPoint.y, h)
         }
         const corner = cornerRef.current
-        const key = `${direction}:${corner}:${adjacent?.key ?? 'none'}`
+        const kind = kindRef.current
+        const key = `${direction}:${corner}:${kind}:${adjacent?.key ?? 'none'}`
         if (sessionKeyRef.current !== key) {
           sessionKeyRef.current = key
-          callbacksRef.current.onDragSessionChange({ direction, corner, adjacent })
+          callbacksRef.current.onDragSessionChange({ direction, corner, kind, adjacent })
         }
-        const point = adjacent
-          ? toCurlPagePoint(clampCurlDragPoint(s.dragPoint, direction, w), direction)
-          : getDampedCurlPoint(direction, corner, s.dragOffset, s.dragPoint.y, w, h)
-        const written = renderPoint(direction, corner, w, h, point, adjacent !== null)
+        const written =
+          kind === 'straight'
+            ? renderStraightFrame(s.dragPoint.x, w, h, adjacent !== null)
+            : renderPoint(
+                direction,
+                corner,
+                w,
+                h,
+                adjacent
+                  ? toCurlPagePoint(clampCurlDragPoint(s.dragPoint, direction, w), direction)
+                  : getDampedCurlPoint(direction, corner, s.dragOffset, s.dragPoint.y, w, h),
+                adjacent !== null
+              )
         if (!written) {
           // flap 克隆未挂载（会话首帧）：补帧重试直至挂载，避免平铺态闪帧
           if (retryRef.current < 30) {
@@ -303,6 +431,7 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
       if (sessionKeyRef.current !== null) {
         sessionKeyRef.current = null
         cornerRef.current = null
+        kindRef.current = 'corner'
         retryRef.current = 0
         callbacksRef.current.onDragSessionChange(null)
       }
@@ -338,7 +467,18 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
   }, [enabled])
 
   return {
-    playSpring: ({ direction, corner, from, to, velocity = 0, hasAdjacent = true, onComplete }) => {
+    playSpring: ({
+      direction,
+      corner,
+      kind = 'corner',
+      from,
+      to,
+      fromX,
+      toX,
+      velocity = 0,
+      hasAdjacent = true,
+      onComplete
+    }) => {
       cancelSpring()
       const size = getPageSize()
       if (!size) {
@@ -346,23 +486,60 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
         return
       }
       const { w, h } = size
+
+      if (kind === 'straight') {
+        // 直线折痕：spring 直接驱动 fingerX（px 空间，沿用默认 px 落定容差）
+        const startX = fromX ?? w
+        const endX = toX ?? -w
+        renderStraightFrame(startX, w, h, hasAdjacent)
+        // viewport x 速度与 fingerX 同向（next），无需投影；clamp 极端甩动
+        const v = Math.max(
+          -MAX_SPRING_PX_VELOCITY,
+          Math.min(MAX_SPRING_PX_VELOCITY, velocity)
+        )
+        springRef.current = createSpringAnimation({
+          from: startX,
+          to: endX,
+          velocity: v,
+          config: CURL_FLIP_SPRING,
+          maxDurationMs: CURL_SPRING_MAX_DURATION_MS,
+          onUpdate: (x) => {
+            renderStraightFrame(x, w, h, hasAdjacent)
+          },
+          onComplete: () => {
+            springRef.current = null
+            onComplete()
+            const s = useReadingStore.getState()
+            if (!s.flipAnimating && s.dragOffset === 0) {
+              lastPointRef.current = null
+              clearAll()
+            }
+          }
+        })
+        return
+      }
+
+      // 对角折角：spring 驱动路径参数 t（0→1）
+      const start = from!
+      const end = to!
       // 首帧同步渲染起点（from 无跳变起步）
-      renderPoint(direction, corner, w, h, from, hasAdjacent)
-      const rawV = projectVelocityToPath(velocity, direction, from, to)
+      renderPoint(direction, corner, w, h, start, hasAdjacent)
+      const rawV = projectVelocityToPath(velocity, direction, start, end)
       const v = Math.max(-MAX_SPRING_T_VELOCITY, Math.min(MAX_SPRING_T_VELOCITY, rawV))
 
       springRef.current = createSpringAnimation({
         from: 0,
         to: 1,
         velocity: v,
+        config: CURL_FLIP_SPRING,
+        settleTolerance: CURL_SPRING_SETTLE,
+        maxDurationMs: CURL_SPRING_MAX_DURATION_MS,
         onUpdate: (t) => {
-          renderPoint(direction, corner, w, h, lerpCurlPoint(from, to, t), hasAdjacent)
+          renderPoint(direction, corner, w, h, lerpCurlPoint(start, end, t), hasAdjacent)
         },
         onComplete: () => {
           springRef.current = null
           onComplete()
-          // 落幕同步归位：onComplete（finalizeAnim）已同步完成结构重排
-          // （提交转正/回弹卸载克隆），空闲态立即清除全部 clip/transform/阴影
           const s = useReadingStore.getState()
           if (!s.flipAnimating && s.dragOffset === 0) {
             lastPointRef.current = null

@@ -12,6 +12,7 @@ import type { CurlCorner, CurlDirection, CurlFrame, CurlPoint } from './types'
 export { CurlCalculation } from './calculation'
 export {
   buildBottomPageClipPath,
+  buildCreaseShadowStyle,
   buildFlippingBackFaceStyle,
   buildFlippingPageStyle,
   buildInnerShadowStyle,
@@ -19,6 +20,15 @@ export {
   curlToGlobal,
   type CurlShadowStyle
 } from './render-style'
+export {
+  buildStraightBottomClip,
+  buildStraightFlapStyle,
+  buildStraightShadowStyle,
+  computeStraightFold,
+  type StraightFoldFrame,
+  type StraightShadowKind,
+  type StraightShadowStyle
+} from './straight-fold'
 export type { CurlCorner, CurlDirection, CurlFrame, CurlPoint, CurlRectPoints } from './types'
 
 /**

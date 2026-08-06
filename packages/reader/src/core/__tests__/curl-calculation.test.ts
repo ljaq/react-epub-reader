@@ -24,6 +24,7 @@ import {
 } from '../curl'
 import {
   buildBottomPageClipPath,
+  buildCreaseShadowStyle,
   buildFlippingBackFaceStyle,
   buildFlippingPageStyle,
   buildInnerShadowStyle,
@@ -222,12 +223,13 @@ describe('render-style 样式构建', () => {
     expect(buildBottomPageClipPath(backFrame, -1)).toBeNull()
   })
 
-  it('双阴影样式：宽度随 progress、不透明度 = 1-progress、含 transform-origin 与 clip', () => {
+  it('双阴影样式：宽度随 progress、不透明度按系数减淡、含 transform-origin 与 clip', () => {
     const outer = buildOuterShadowStyle(frame, 1, W, H)!
     expect(outer.width).toBeCloseTo(W * 0.75 * frame.progress, 3)
     expect(outer.height).toBe(H * 2)
     expect(outer.transformOrigin).toBe('0.00px 100px') // next: shadowTranslate=0
-    expect(outer.background).toContain(`rgba(0, 0, 0, ${(1 - frame.progress).toFixed(3)})`)
+    // 外阴影减淡：opacity = (1-progress) × 0.45
+    expect(outer.background).toContain(`rgba(0, 0, 0, ${((1 - frame.progress) * 0.45).toFixed(3)})`)
     expect(outer.clipPath.startsWith('polygon(')).toBe(true)
 
     const inner = buildInnerShadowStyle(frame, 1, W, H)!
@@ -236,10 +238,25 @@ describe('render-style 样式构建', () => {
     expect(inner.background).toContain('to left')
   })
 
+  it('折痕淡阴影（平铺页一侧）：宽度=外阴影一半、低不透明度、同折痕锚点', () => {
+    const crease = buildCreaseShadowStyle(frame, 1, W, H)!
+    expect(crease.width).toBeCloseTo((W * 0.75 * frame.progress) / 2, 3)
+    expect(crease.background).toContain(
+      `rgba(0, 0, 0, ${((1 - frame.progress) * 0.16).toFixed(3)})`
+    )
+    expect(crease.clipPath.startsWith('polygon(')).toBe(true)
+    const outer = buildOuterShadowStyle(frame, 1, W, H)!
+    expect(crease.transformOrigin).not.toBe(outer.transformOrigin) // 位于外阴影对侧
+    // next：折痕淡阴影在平铺页侧（translate=width，渐变向左淡出）
+    expect(crease.transformOrigin).toBe(`${crease.width.toFixed(2)}px 100px`)
+    expect(crease.background).toContain('to left')
+  })
+
   it('shadowStart 为 null 时阴影样式返回 null', () => {
     const empty = { ...frame, shadowStart: null }
     expect(buildOuterShadowStyle(empty, 1, W, H)).toBeNull()
     expect(buildInnerShadowStyle(empty, 1, W, H)).toBeNull()
+    expect(buildCreaseShadowStyle(empty, 1, W, H)).toBeNull()
   })
 })
 

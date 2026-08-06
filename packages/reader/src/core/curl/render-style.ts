@@ -178,7 +178,12 @@ function buildShadowStyle(input: ShadowBuildInput, direction: CurlDirection, tra
   }
 }
 
-/** 底层页外阴影（投在底层页上，clip 参照 = 页矩形） */
+/** 外阴影最大不透明度（page-flip 原版为 1.0 全黑，掌阅观感偏淡，减弱到 0.45） */
+const OUTER_SHADOW_MAX_OPACITY = 0.45
+/** 折痕淡阴影（平铺页一侧）最大不透明度 */
+const CREASE_SHADOW_MAX_OPACITY = 0.16
+
+/** 底层页外阴影（投在底层页上，clip 参照 = 页矩形；折痕显露侧） */
 export function buildOuterShadowStyle(
   frame: CurlFrame,
   direction: CurlDirection,
@@ -189,7 +194,7 @@ export function buildOuterShadowStyle(
     return null
   }
   const width = pageWidth * 0.75 * frame.progress
-  const opacity = 1 - frame.progress
+  const opacity = (1 - frame.progress) * OUTER_SHADOW_MAX_OPACITY
   return buildShadowStyle(
     {
       shadowPos: frame.shadowStart,
@@ -209,6 +214,44 @@ export function buildOuterShadowStyle(
     direction === 1
       ? 'linear-gradient(to right, rgba(0, 0, 0, $OPACITY), rgba(0, 0, 0, 0))'
       : 'linear-gradient(to left, rgba(0, 0, 0, $OPACITY), rgba(0, 0, 0, 0))'
+  )
+}
+
+/**
+ * 折痕淡阴影（phase-14 掌阅观感）：纸张向对侧弯折，**平铺页一侧**的折痕旁
+ * 应有一层淡淡阴影（纸张拱起遮光）。几何 = innerShadow 的 translate/渐变方向
+ * （即外阴影的对侧），clip 参照 = 页矩形（落在平铺页上）。
+ */
+export function buildCreaseShadowStyle(
+  frame: CurlFrame,
+  direction: CurlDirection,
+  pageWidth: number,
+  pageHeight: number
+): CurlShadowStyle | null {
+  if (!frame.shadowStart) {
+    return null
+  }
+  const width = (pageWidth * 0.75 * frame.progress) / 2
+  const opacity = (1 - frame.progress) * CREASE_SHADOW_MAX_OPACITY
+  return buildShadowStyle(
+    {
+      shadowPos: frame.shadowStart,
+      shadowAngle: frame.shadowAngle,
+      width,
+      opacity,
+      clipRect: [
+        { x: 0, y: 0 },
+        { x: pageWidth, y: 0 },
+        { x: pageWidth, y: pageHeight },
+        { x: 0, y: pageHeight }
+      ],
+      height: pageHeight * 2
+    },
+    direction,
+    direction === 1 ? width : 0,
+    direction === 1
+      ? 'linear-gradient(to left, rgba(0, 0, 0, $OPACITY), rgba(0, 0, 0, 0))'
+      : 'linear-gradient(to right, rgba(0, 0, 0, $OPACITY), rgba(0, 0, 0, 0))'
   )
 }
 

@@ -37,3 +37,13 @@
   transition: opacity 0.12s linear;
   pointer-events: none;
 }
+
+/* 翻页页边缘外阴影（掌阅级）：drop-shadow 基于 clip-path 裁剪后的轮廓向外投影，
+   纸张自由边（上/下/右缘与折痕边）在底层页上投出柔和的浮动阴影。
+   无偏移光晕保证上/下/右三缘都有对称阴影（带偏移会导致背光缘缺失）；
+   叠加一层更宽更淡的柔光增强边缘厚度感。
+   （box-shadow 会被 clip-path 裁掉，故用 filter；阴影随每帧轮廓重算） */
+.paged-reader__page--curl-flap {
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.28))
+    drop-shadow(0 0 14px rgba(0, 0, 0, 0.16));
+}

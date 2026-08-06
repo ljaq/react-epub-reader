@@ -66,7 +66,7 @@ export const PageSurfaceView = memo(function PageSurfaceView(props: PageSurfaceV
   return (
     <div
       ref={rootRef}
-      className={`paged-reader__page${cloneHostRef ? ' paged-reader__page--clone' : ''}${moving ? ' paged-reader__page--moving' : ''}`}
+      className={`paged-reader__page${cloneHostRef ? ' paged-reader__page--clone' : ''}${moving ? ' paged-reader__page--moving' : ''}${curlFlap ? ' paged-reader__page--curl-flap' : ''}`}
       style={pageStyle}
       data-segment-id={segmentId}
     >

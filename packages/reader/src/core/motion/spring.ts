@@ -67,6 +67,14 @@ export interface SpringAnimationInput {
   raf?: (cb: () => void) => number
   /** 可注入 cancelAnimationFrame */
   cancelRaf?: (id: number) => void
+  /** 覆盖硬超时兜底（默认 SPRING_MAX_DURATION_MS=600；慢速弹簧需放宽） */
+  maxDurationMs?: number
+  /**
+   * 覆盖落定容差（velocity 与 API 速度同单位 /ms；默认按 px 标定：0.5px / 0.01px·ms⁻¹）。
+   * 归一化空间（如 curl 路径参数 t∈[0,1]）必须按量程覆盖，否则容差比量程还大，
+   * 弹簧在半途即误判落定并被 snap 到终点（动画"瞬间完成"）。
+   */
+  settleTolerance?: { position: number; velocity: number }
 }
 
 export interface SpringAnimation {
@@ -82,6 +90,9 @@ const defaultCancelRaf = (id: number): void => cancelAnimationFrame(id)
 export function createSpringAnimation(input: SpringAnimationInput): SpringAnimation {
   const { from, to, onUpdate, onComplete } = input
   const cfg: SpringConfig = { ...PAGE_FLIP_SPRING, ...input.config }
+  const maxDurationMs = input.maxDurationMs ?? SPRING_MAX_DURATION_MS
+  const settlePosition = input.settleTolerance?.position ?? SPRING_SETTLE_POSITION_EPSILON
+  const settleVelocity = (input.settleTolerance?.velocity ?? SPRING_SETTLE_VELOCITY_EPSILON) * MS_PER_SECOND
   const now = input.now ?? defaultNow
   const raf = input.raf ?? defaultRaf
   const cancelRaf = input.cancelRaf ?? defaultCancelRaf
@@ -125,9 +136,9 @@ export function createSpringAnimation(input: SpringAnimationInput): SpringAnimat
     }
 
     const settled =
-      Math.abs(x - to) < SPRING_SETTLE_POSITION_EPSILON &&
-      Math.abs(v) < SPRING_SETTLE_VELOCITY_EPSILON * MS_PER_SECOND
-    if (settled || t - startedAt > SPRING_MAX_DURATION_MS) {
+      Math.abs(x - to) < settlePosition &&
+      Math.abs(v) < settleVelocity
+    if (settled || t - startedAt > maxDurationMs) {
       finish()
       return
     }
