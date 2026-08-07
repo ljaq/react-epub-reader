@@ -55,7 +55,6 @@ import {
 } from '../../../core/flip'
 import { resolveAdjacentPageSurface, resolvePageSurface, type PageSurface } from '../../../core/pages'
 import {
-  getCurlClickStartPoint,
   getCurlCommitPoint,
   getCurlRestPoint,
   type CurlCorner,
@@ -265,13 +264,17 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
       if (isCurl && 'corner' in session) {
         // 仿真三元素模型（page-flip portrait 同构）：
         // next：主槽=下一页（底层显露 clip），flap 槽=当前页折角副本；
-        // prev：flap 槽=上一页铺入（主槽闲时清空）；首末页阻尼：flap 槽=当前页副本
+        // prev+straight：主槽=上一页已放平区，flap=上一页卷边（向右放平）；
+        // prev+corner：flap=上一页对角铺入（主槽闲）；首末页阻尼：flap=当前页副本
         const state = useReadingStore.getState()
         const current = resolvePageSurface(state.globalPageIndex, state.buffer)
         if (session.direction === 1) {
           if (session.adjacent) showClone(session.adjacent)
           else clearClone()
           if (current) showFlapClone(current)
+        } else if (session.kind === 'straight' && session.adjacent) {
+          showClone(session.adjacent)
+          showFlapClone(session.adjacent)
         } else {
           clearClone()
           const flap = session.adjacent ?? current
@@ -356,11 +359,16 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
       // 复位拖拽残留位移：from 已捕获松手折角点，补间由 animState + 弹簧驱动
       state.setDragOffset(0)
       // 克隆槽位（点击路径在此挂载；拖拽路径已被会话回调挂载，此处幂等）：
-      // next：主槽=下一页 + flap=当前页副本；prev：flap=上一页；首末页：flap=当前页副本
+      // next：主槽=下一页 + flap=当前页副本；
+      // prev+straight：主槽+flap=上一页（放平区/卷边）；prev+corner：flap=上一页；
+      // 首末页：flap=当前页副本
       const current = resolvePageSurface(state.globalPageIndex, state.buffer)
       if (anim.direction === 1) {
         if (anim.adjacent) showClone(anim.adjacent)
         if (current) showFlapClone(current)
+      } else if (anim.kind === 'straight' && anim.adjacent) {
+        showClone(anim.adjacent)
+        showFlapClone(anim.adjacent)
       } else {
         const flap = anim.adjacent ?? current
         if (flap) showFlapClone(flap)
@@ -370,13 +378,19 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
       const velocity = state.dragReleaseVelocity
       if (velocity !== 0) state.setDragReleaseVelocity(0)
       if (anim.kind === 'straight') {
-        // 直线折痕：spring 驱动 fingerX；提交终点 = -w（完全翻过），回弹 = +w（静止）
+        // 直线折痕：共用 fingerX；next 提交→-w / 回弹→w；prev 提交→w（放平）/ 回弹→-w
         curlBridgeRef.current.playSpring({
           direction: anim.direction,
           corner: anim.corner,
           kind: 'straight',
           fromX: anim.fromX,
-          toX: anim.commit ? -w : w,
+          toX: anim.commit
+            ? anim.direction === 1
+              ? -w
+              : w
+            : anim.direction === 1
+              ? w
+              : -w,
           velocity,
           hasAdjacent: anim.adjacent !== null,
           onComplete: finalizeAnim
@@ -431,7 +445,9 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
           const direction: CurlDirection = state.dragOffset < 0 ? 1 : -1
           const adjacent = resolveAdjacentPageSurface(current, direction, state.buffer)
           if (sessionKind === 'straight') {
-            const fromX = curlBridgeRef.current.getCurrentPoint()?.x ?? pw
+            const fromX =
+              curlBridgeRef.current.getCurrentPoint()?.x ??
+              (direction === 1 ? pw : -pw)
             startCurlAnim({
               direction,
               corner: sessionCorner,
@@ -465,7 +481,9 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
         if (lastDx !== 0) {
           // 拖拽提交：从松手点继续飞出（速度连续）
           if (sessionKind === 'straight') {
-            const fromX = curlBridgeRef.current.getCurrentPoint()?.x ?? pw
+            const fromX =
+              curlBridgeRef.current.getCurrentPoint()?.x ??
+              (direction === 1 ? pw : -pw)
             startCurlAnim({
               direction,
               corner: sessionCorner,
@@ -489,8 +507,7 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
           }
           return true
         }
-        // 点击 20%/80% 分区翻页：
-        // next → 直线折痕（掌阅级竖直揭起）；prev → 对角折角（上一页正面铺入）
+        // 点击 20%/80% 分区翻页：两方向直线折痕，fingerX 共用（next 从右缘掀、prev 从左侧卷入后向右放平）
         if (h <= 0) return false
         if (direction === 1) {
           startCurlAnim({
@@ -505,9 +522,9 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
           startCurlAnim({
             direction,
             corner: 'bottom',
-            kind: 'corner',
+            kind: 'straight',
             commit: true,
-            from: getCurlClickStartPoint(direction, 'bottom', pw, h),
+            fromX: -pw + h / 10,
             adjacent
           })
         }

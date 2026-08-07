@@ -275,16 +275,19 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
   }
 
   /**
-   * 直线折痕单帧渲染（仅 next；竖直折痕，flap 反射矩阵 + 轴对齐阴影带）。
+   * 直线折痕单帧渲染（两方向共用 fingerX 几何：w=放平，-w=翻到左侧外）。
+   * next：flap=当前页背面卷出，主克隆=下一页 [creaseX,w]；
+   * prev：flap=上一页背面卷边，主克隆=上一页已放平区 [0,creaseX]（右滑→向右放平）。
    * @returns 翻页页元素是否已挂载并完成写入（false 时调用方补帧重试）
    */
   const renderStraightFrame = (
     fingerX: number,
+    direction: CurlDirection,
     w: number,
     h: number,
     hasAdjacent: boolean
   ): boolean => {
-    const sf = computeStraightFold(fingerX, 1, w, h)
+    const sf = computeStraightFold(fingerX, direction, w, h)
     if (!sf) return true
     lastPointRef.current = { x: fingerX, y: 0 }
     const flippingEl = flapCloneRootRef.current
@@ -293,7 +296,7 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
       const st = buildStraightFlapStyle(sf)
       flippingEl.style.transform = st.transform
       flippingEl.style.clipPath = st.clipPath
-      // 背面（竖直镜像反向文字 + 纸色罩）
+      // 卷边一律纸张背面（反向文字 + 纸色罩）
       flippingEl.style.setProperty('--curl-tint', '0.55')
     }
     if (bottomEl) {
@@ -304,7 +307,8 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
     writeStraightShadow(outerShadowRef.current, buildStraightShadowStyle(sf, 'outer'))
     writeStraightShadow(creaseShadowRef.current, buildStraightShadowStyle(sf, 'crease'))
     writeStraightShadow(innerShadowRef.current, buildStraightShadowStyle(sf, 'inner'))
-    return flippingEl !== null
+    // prev 需要主克隆承载已放平区；两者都就绪才算写入成功
+    return flippingEl !== null && (!hasAdjacent || bottomEl !== null)
   }
 
   /**
@@ -388,11 +392,10 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
         const { w, h } = size
         const direction: CurlDirection = s.dragOffset < 0 ? 1 : -1
         const adjacent = resolveAdjacentPageSurface(current, direction, s.buffer)
-        // 会话首帧：按按下点 y 决定折叠模型（next 中部=竖直折痕，其余=对角折角）
+        // 会话首帧：中部区域用直线折痕（两方向对称）；上下角用对角折角
         if (sessionKeyRef.current === null || cornerRef.current === null) {
           const midBand = Math.abs(s.dragPoint.y - h / 2) < h * 0.25
-          kindRef.current =
-            direction === 1 && midBand ? 'straight' : 'corner'
+          kindRef.current = midBand ? 'straight' : 'corner'
           cornerRef.current = resolveCurlCorner(s.dragPoint.y, h)
         }
         const corner = cornerRef.current
@@ -402,9 +405,11 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
           sessionKeyRef.current = key
           callbacksRef.current.onDragSessionChange({ direction, corner, kind, adjacent })
         }
+        // 直线折痕跟手：两方向均以触点 x 为自由边（与左滑一致，从手势位置起）。
+        // next：触点左移 → fingerX↓ → 向左卷出；prev：触点右移 → fingerX↑ → 向右放平。
         const written =
           kind === 'straight'
-            ? renderStraightFrame(s.dragPoint.x, w, h, adjacent !== null)
+            ? renderStraightFrame(s.dragPoint.x, direction, w, h, adjacent !== null)
             : renderPoint(
                 direction,
                 corner,
@@ -416,7 +421,7 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
                 adjacent !== null
               )
         if (!written) {
-          // flap 克隆未挂载（会话首帧）：补帧重试直至挂载，避免平铺态闪帧
+          // flap/主克隆未挂载（会话首帧）：补帧重试直至挂载，避免平铺态闪帧
           if (retryRef.current < 30) {
             retryRef.current += 1
             batcher.schedule(applyFrame)
@@ -488,11 +493,10 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
       const { w, h } = size
 
       if (kind === 'straight') {
-        // 直线折痕：spring 直接驱动 fingerX（px 空间，沿用默认 px 落定容差）
-        const startX = fromX ?? w
-        const endX = toX ?? -w
-        renderStraightFrame(startX, w, h, hasAdjacent)
-        // viewport x 速度与 fingerX 同向（next），无需投影；clamp 极端甩动
+        // 共用 fingerX：放平=w，翻出=-w；prev 提交 w←-w（向右放平），回弹回 -w
+        const startX = fromX ?? (direction === 1 ? w : -w)
+        const endX = toX ?? (direction === 1 ? -w : w)
+        renderStraightFrame(startX, direction, w, h, hasAdjacent)
         const v = Math.max(
           -MAX_SPRING_PX_VELOCITY,
           Math.min(MAX_SPRING_PX_VELOCITY, velocity)
@@ -504,7 +508,7 @@ export function useCurlMotionBridge(input: UseCurlMotionBridgeInput): CurlMotion
           config: CURL_FLIP_SPRING,
           maxDurationMs: CURL_SPRING_MAX_DURATION_MS,
           onUpdate: (x) => {
-            renderStraightFrame(x, w, h, hasAdjacent)
+            renderStraightFrame(x, direction, w, h, hasAdjacent)
           },
           onComplete: () => {
             springRef.current = null
