@@ -70,12 +70,11 @@ export function buildFlippingPageStyle(
  * clip 多边形 = F(flippingClip) —— 不变量：T(F(p)) ≡ p（屏幕落点不变，仅内容镜像）。
  * shadowStart 为 null 的退化帧返回 null（桥接跳过该帧）。
  *
- * 注意：prev（铺入）方向不要用本函数 —— 其坐标约定下 F 会把 clip 映到页框外；
- * prev 上一页正面朝上转入，用 buildFlippingPageStyle 正面渲染即可。
+ * 左右滑均在 viewport/next 同构坐标下调用（direction 恒为 1）；prev 只换图层内容。
  */
 export function buildFlippingBackFaceStyle(
   frame: CurlFrame,
-  direction: CurlDirection
+  direction: CurlDirection = 1
 ): { transform: string; clipPath: string } | null {
   const s = frame.shadowStart
   if (!s) {
@@ -86,7 +85,7 @@ export function buildFlippingBackFaceStyle(
   const sn = Math.sin(2 * beta)
   const tx = s.x - (a * s.x + sn * s.y)
   const ty = s.y - (sn * s.x - a * s.y)
-  // prev：页坐标 → viewport 镜像 M=diag(-1,1)；A_v = M·A·M，t_v = M·t
+  // 旧版 prev 页坐标镜像；viewport 同构下 direction 恒为 1
   const m = direction === -1 ? -1 : 1
 
   const points: CurlPoint[] = []
@@ -106,13 +105,11 @@ export function buildFlippingBackFaceStyle(
 }
 
 /**
- * 底层页 clip-path：next 时底层页（下一页克隆）按 bottomClip 裁剪（静止、无旋转，局部=页坐标）；
- * prev 时底层页（当前页）完整显示不裁剪（返回 null）。
+ * 底层显露区 clip-path（next）：下一页克隆按 bottomClip 裁剪（静止、无旋转）。
+ * 几何帧一律按 viewport/next 同构计算时，本函数不再区分 direction。
  */
-export function buildBottomPageClipPath(frame: CurlFrame, direction: CurlDirection): string | null {
-  if (direction === -1) {
-    return null
-  }
+export function buildBottomPageClipPath(frame: CurlFrame, _direction?: CurlDirection): string | null {
+  void _direction
   const points: CurlPoint[] = []
   for (const p of frame.bottomClip) {
     if (p === null) continue
@@ -122,6 +119,72 @@ export function buildBottomPageClipPath(frame: CurlFrame, direction: CurlDirecti
     return null
   }
   return pointsToPolygon(points)
+}
+
+/**
+ * prev 已放平区 clip-path：主克隆（上一页）显示折痕靠书脊一侧。
+ *
+ * 不用 evenodd 挖 bottomClip——过中线后 bottomClip 拓扑突变会留下三角漏片。
+ * 改为：用折痕（shadowStart + shadowAngle）半平面裁切页矩形，保留含书脊 (x=0) 的一侧。
+ */
+export function buildLandedPageClipPath(
+  frame: CurlFrame,
+  pageWidth: number,
+  pageHeight: number
+): string | null {
+  const full = `polygon(0px 0px, ${pageWidth.toFixed(2)}px 0px, ${pageWidth.toFixed(2)}px ${pageHeight.toFixed(2)}px, 0px ${pageHeight.toFixed(2)}px)`
+  const s = frame.shadowStart
+  if (!s || frame.progress <= 1e-4) {
+    return full
+  }
+
+  const ang = frame.shadowAngle
+  const dx = Math.cos(ang)
+  const dy = Math.sin(ang)
+  // 折痕法线；取指向书脊侧的那条，使 landed = (p-s)·n ≥ 0
+  let nx = -dy
+  let ny = dx
+  const spineX = 0
+  const spineY = pageHeight / 2
+  if ((spineX - s.x) * nx + (spineY - s.y) * ny < 0) {
+    nx = -nx
+    ny = -ny
+  }
+
+  const corners: CurlPoint[] = [
+    { x: 0, y: 0 },
+    { x: pageWidth, y: 0 },
+    { x: pageWidth, y: pageHeight },
+    { x: 0, y: pageHeight }
+  ]
+  const eps = 1e-4
+  const inside = (p: CurlPoint): boolean => (p.x - s.x) * nx + (p.y - s.y) * ny >= -eps
+  const intersect = (a: CurlPoint, b: CurlPoint): CurlPoint => {
+    const da = (a.x - s.x) * nx + (a.y - s.y) * ny
+    const db = (b.x - s.x) * nx + (b.y - s.y) * ny
+    const t = da / (da - db)
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
+  }
+
+  // Sutherland–Hodgman：页矩形 ∩ 书脊侧半平面
+  const out: CurlPoint[] = []
+  for (let i = 0; i < corners.length; i++) {
+    const cur = corners[i]
+    const prev = corners[(i + corners.length - 1) % corners.length]
+    const curIn = inside(cur)
+    const prevIn = inside(prev)
+    if (curIn) {
+      if (!prevIn) out.push(intersect(prev, cur))
+      out.push(cur)
+    } else if (prevIn) {
+      out.push(intersect(prev, cur))
+    }
+  }
+
+  if (out.length < 3) {
+    return 'polygon(0px 0px, 0px 0px, 0px 0px)'
+  }
+  return pointsToPolygon(out)
 }
 
 export interface CurlShadowStyle {

@@ -96,16 +96,16 @@ interface CoverAnimState {
   adjacent: PageSurface | null
 }
 
-/** 仿真翻页弹簧动画状态（phase-14）：折角点路径弹簧，其余语义与 CoverAnimState 同构 */
+/** 仿真翻页弹簧动画状态（phase-14）：其余语义与 CoverAnimState 同构 */
 interface CurlAnimState {
   direction: CurlDirection
   corner: CurlCorner
-  /** 折叠模型：corner=对角折角；straight=竖直折痕（右侧中部起翻） */
+  /** corner=对角折角；straight=中部竖直折痕 */
   kind: 'corner' | 'straight'
   commit: boolean
-  /** 动画起点折角点（页坐标，corner 模型）：拖拽松手=当前跟手点；点击=页角内侧起点 */
+  /** 对角模型起点（viewport 同构） */
   from?: CurlPoint
-  /** 直线折痕模型起点 fingerX（px，页坐标；corner 模型忽略） */
+  /** 直线折痕模型起点 fingerX */
   fromX?: number
   adjacent: PageSurface | null
 }
@@ -262,23 +262,19 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
         setSettlingClone(false)
       }
       if (isCurl && 'corner' in session) {
-        // 仿真三元素模型（page-flip portrait 同构）：
-        // next：主槽=下一页（底层显露 clip），flap 槽=当前页折角副本；
-        // prev+straight：主槽=上一页已放平区，flap=上一页卷边（向右放平）；
-        // prev+corner：flap=上一页对角铺入（主槽闲）；首末页阻尼：flap=当前页副本
+        // 统一对角折角：next 主槽=下一页 / flap=当前；prev 主槽+flap=上一页（已放平/卷边）
         const state = useReadingStore.getState()
         const current = resolvePageSurface(state.globalPageIndex, state.buffer)
         if (session.direction === 1) {
           if (session.adjacent) showClone(session.adjacent)
           else clearClone()
           if (current) showFlapClone(current)
-        } else if (session.kind === 'straight' && session.adjacent) {
+        } else if (session.adjacent) {
           showClone(session.adjacent)
           showFlapClone(session.adjacent)
         } else {
           clearClone()
-          const flap = session.adjacent ?? current
-          if (flap) showFlapClone(flap)
+          if (current) showFlapClone(current)
         }
         return
       }
@@ -348,7 +344,7 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
     [showClone, finalizeAnim]
   )
 
-  // 仿真翻页：启动折角点路径弹簧（起点 from 速度连续，目标 = commit/rest 折角点）
+  // 仿真翻页弹簧：next 提交→-w / 回弹→+w；prev 提交→+w（放平）/ 回弹→-w
   const startCurlAnim = useCallback(
     (anim: CurlAnimState) => {
       const state = useReadingStore.getState()
@@ -356,29 +352,21 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
       const h = currentRootRef.current?.clientHeight ?? 0
       if (w <= 0 || h <= 0) return
       state.setFlipAnimating(true)
-      // 复位拖拽残留位移：from 已捕获松手折角点，补间由 animState + 弹簧驱动
       state.setDragOffset(0)
-      // 克隆槽位（点击路径在此挂载；拖拽路径已被会话回调挂载，此处幂等）：
-      // next：主槽=下一页 + flap=当前页副本；
-      // prev+straight：主槽+flap=上一页（放平区/卷边）；prev+corner：flap=上一页；
-      // 首末页：flap=当前页副本
       const current = resolvePageSurface(state.globalPageIndex, state.buffer)
       if (anim.direction === 1) {
         if (anim.adjacent) showClone(anim.adjacent)
         if (current) showFlapClone(current)
-      } else if (anim.kind === 'straight' && anim.adjacent) {
+      } else if (anim.adjacent) {
         showClone(anim.adjacent)
         showFlapClone(anim.adjacent)
-      } else {
-        const flap = anim.adjacent ?? current
-        if (flap) showFlapClone(flap)
+      } else if (current) {
+        showFlapClone(current)
       }
       setAnimState(anim)
-      // 消费松手速度（px/ms）作为弹簧初速度（桥接内投影到路径参数 t），读取后复位
       const velocity = state.dragReleaseVelocity
       if (velocity !== 0) state.setDragReleaseVelocity(0)
       if (anim.kind === 'straight') {
-        // 直线折痕：共用 fingerX；next 提交→-w / 回弹→w；prev 提交→w（放平）/ 回弹→-w
         curlBridgeRef.current.playSpring({
           direction: anim.direction,
           corner: anim.corner,
@@ -395,20 +383,28 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
           hasAdjacent: anim.adjacent !== null,
           onComplete: finalizeAnim
         })
-      } else {
-        curlBridgeRef.current.playSpring({
-          direction: anim.direction,
-          corner: anim.corner,
-          kind: 'corner',
-          from: anim.from,
-          to: anim.commit
-            ? getCurlCommitPoint(anim.corner, w, h)
-            : getCurlRestPoint(anim.corner, w, h),
-          velocity,
-          hasAdjacent: anim.adjacent !== null,
-          onComplete: finalizeAnim
-        })
+        return
       }
+      const rest = getCurlRestPoint(anim.corner, w, h)
+      const commitPt = getCurlCommitPoint(anim.corner, w, h)
+      const to =
+        anim.direction === 1
+          ? anim.commit
+            ? commitPt
+            : rest
+          : anim.commit
+            ? rest
+            : commitPt
+      curlBridgeRef.current.playSpring({
+        direction: anim.direction,
+        corner: anim.corner,
+        kind: 'corner',
+        from: anim.from,
+        to,
+        velocity,
+        hasAdjacent: anim.adjacent !== null,
+        onComplete: finalizeAnim
+      })
     },
     [showClone, showFlapClone, finalizeAnim]
   )
@@ -434,32 +430,30 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
       //    提交/回弹 = 折角点路径弹簧；首末页 = 阻尼折角回弹 ──
       if (isCurl) {
         const session = dragSessionRef.current
-        const sessionKind: 'corner' | 'straight' =
-          session && 'kind' in session ? session.kind : 'corner'
         const sessionCorner: CurlCorner =
           session && 'corner' in session ? session.corner : 'bottom'
+        const sessionKind: 'corner' | 'straight' =
+          session && 'kind' in session ? session.kind : 'corner'
         const h = currentRootRef.current?.clientHeight ?? 0
         if (action === 'stay') {
-          // 未过阈值回弹；无位移（理论不可达）走默认收尾
           if (state.dragOffset === 0) return false
           const direction: CurlDirection = state.dragOffset < 0 ? 1 : -1
           const adjacent = resolveAdjacentPageSurface(current, direction, state.buffer)
           if (sessionKind === 'straight') {
-            const fromX =
-              curlBridgeRef.current.getCurrentPoint()?.x ??
-              (direction === 1 ? pw : -pw)
             startCurlAnim({
               direction,
               corner: sessionCorner,
               kind: 'straight',
               commit: false,
-              fromX,
+              fromX: curlBridgeRef.current.getCurrentPoint()?.x ?? (direction === 1 ? pw : -pw),
               adjacent
             })
           } else {
             const from =
               curlBridgeRef.current.getCurrentPoint() ??
-              getCurlRestPoint(sessionCorner, pw, h)
+              (direction === 1
+                ? getCurlRestPoint(sessionCorner, pw, h)
+                : getCurlCommitPoint(sessionCorner, pw, h))
             startCurlAnim({
               direction,
               corner: sessionCorner,
@@ -474,28 +468,24 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
         const direction: CurlDirection = action === 'next-page' ? 1 : -1
         const adjacent = resolveAdjacentPageSurface(current, direction, state.buffer)
         if (!adjacent) {
-          // 首末页：点击边界 → 默认 turnPage 边界钳制 no-op
-          // （拖拽越界由 resolveGlobalDragTurn 判 stay，走上方回弹分支）
           return false
         }
         if (lastDx !== 0) {
-          // 拖拽提交：从松手点继续飞出（速度连续）
           if (sessionKind === 'straight') {
-            const fromX =
-              curlBridgeRef.current.getCurrentPoint()?.x ??
-              (direction === 1 ? pw : -pw)
             startCurlAnim({
               direction,
               corner: sessionCorner,
               kind: 'straight',
               commit: true,
-              fromX,
+              fromX: curlBridgeRef.current.getCurrentPoint()?.x ?? (direction === 1 ? pw : -pw),
               adjacent
             })
           } else {
             const from =
               curlBridgeRef.current.getCurrentPoint() ??
-              getCurlRestPoint(sessionCorner, pw, h)
+              (direction === 1
+                ? getCurlRestPoint(sessionCorner, pw, h)
+                : getCurlCommitPoint(sessionCorner, pw, h))
             startCurlAnim({
               direction,
               corner: sessionCorner,
@@ -507,27 +497,16 @@ export function PagedReader(props: PagedReaderProps): React.ReactNode {
           }
           return true
         }
-        // 点击 20%/80% 分区翻页：两方向直线折痕，fingerX 共用（next 从右缘掀、prev 从左侧卷入后向右放平）
+        // 点击分区：竖直折痕（中部手感）；next 从右缘揭起，prev 从左侧探入后向右放平
         if (h <= 0) return false
-        if (direction === 1) {
-          startCurlAnim({
-            direction,
-            corner: 'bottom',
-            kind: 'straight',
-            commit: true,
-            fromX: pw - h / 10,
-            adjacent
-          })
-        } else {
-          startCurlAnim({
-            direction,
-            corner: 'bottom',
-            kind: 'straight',
-            commit: true,
-            fromX: -pw + h / 10,
-            adjacent
-          })
-        }
+        startCurlAnim({
+          direction,
+          corner: 'bottom',
+          kind: 'straight',
+          commit: true,
+          fromX: direction === 1 ? pw - h / 10 : -pw + h / 10,
+          adjacent
+        })
         return true
       }
 

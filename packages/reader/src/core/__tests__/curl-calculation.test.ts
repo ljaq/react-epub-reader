@@ -28,6 +28,7 @@ import {
   buildFlippingBackFaceStyle,
   buildFlippingPageStyle,
   buildInnerShadowStyle,
+  buildLandedPageClipPath,
   buildOuterShadowStyle
 } from '../curl/render-style'
 
@@ -214,13 +215,28 @@ describe('render-style 样式构建', () => {
     )
   })
 
-  it('底层页：next 返回 clip polygon，prev 返回 null（完整显示）', () => {
-    const clip = buildBottomPageClipPath(frame, 1)
-    expect(clip === null || clip.startsWith('polygon(')).toBe(true)
+  it('底层显露 / 已放平区 clip：landed 为折痕书脊侧半平面', () => {
+    const bottom = buildBottomPageClipPath(frame)
+    expect(bottom === null || bottom.startsWith('polygon(')).toBe(true)
+    const landed = buildLandedPageClipPath(frame, W, H)!
+    expect(landed.startsWith('polygon(')).toBe(true)
+    expect(landed).not.toContain('evenodd')
+    // 无折痕 → 整页放平
+    expect(buildLandedPageClipPath({ ...frame, shadowStart: null }, W, H)).toContain(
+      `${W.toFixed(2)}px`
+    )
+  })
 
-    const calcBack = new CurlCalculation(-1, 'bottom', W, H)
-    const backFrame = calcCurlFrame(calcBack, { x: -180, y: 350 })!
-    expect(buildBottomPageClipPath(backFrame, -1)).toBeNull()
+  it('已放平区过中线仍为合法多边形（无三角漏片）', () => {
+    const calc = new CurlCalculation(1, 'bottom', W, H)
+    // 扫过中线两侧的折角点
+    for (const x of [40, 120, 180, 240, 300]) {
+      const f = calcCurlFrame(calc, { x, y: H - 40 })
+      if (!f?.shadowStart) continue
+      const landed = buildLandedPageClipPath(f, W, H)!
+      const verts = landed.match(/-?\d+\.\d+px -?\d+\.\d+px/g) ?? []
+      expect(verts.length).toBeGreaterThanOrEqual(3)
+    }
   })
 
   it('双阴影样式：宽度随 progress、不透明度按系数减淡、含 transform-origin 与 clip', () => {
@@ -260,7 +276,7 @@ describe('render-style 样式构建', () => {
   })
 })
 
-describe('翻页页背面（整元素折痕反射，phase-14 增强；仅 next 使用）', () => {
+describe('翻页页背面（整元素折痕反射，viewport 同构）', () => {
   const calc = new CurlCalculation(1, 'bottom', W, H)
   const frame = calcCurlFrame(calc, { x: 180, y: 350 })!
 
@@ -306,12 +322,12 @@ describe('fold-point 帮助函数', () => {
     expect(resolveCurlCorner(350, H)).toBe('bottom')
   })
 
-  it('toCurlPagePoint：next 恒等，prev 镜像', () => {
+  it('toCurlPagePoint：viewport 同构恒等', () => {
     expect(toCurlPagePoint({ x: 120, y: 300 }, 1)).toEqual({ x: 120, y: 300 })
-    expect(toCurlPagePoint({ x: 120, y: 300 }, -1)).toEqual({ x: -120, y: 300 })
+    expect(toCurlPagePoint({ x: 120, y: 300 }, -1)).toEqual({ x: 120, y: 300 })
   })
 
-  it('clampCurlDragPoint：不越过掀起侧边缘', () => {
+  it('clampCurlDragPoint：x 夹在 ±(W-1)', () => {
     expect(clampCurlDragPoint({ x: 400, y: 100 }, 1, W).x).toBe(W - 1)
     expect(clampCurlDragPoint({ x: 200, y: 100 }, 1, W).x).toBe(200)
     expect(clampCurlDragPoint({ x: -400, y: 100 }, -1, W).x).toBe(-(W - 1))
@@ -325,35 +341,29 @@ describe('fold-point 帮助函数', () => {
     expect(getCurlCommitPoint('top', W, H)).toEqual({ x: -W, y: 0 })
   })
 
-  it('getDampedCurlPoint：progress 封顶 15%，方向语义正确', () => {
-    // next 书末：dragOffset=-1000（超限）→ x = W - 0.15*2W = 0.7W
+  it('getDampedCurlPoint：progress 封顶 15%，viewport 同构', () => {
     const p1 = getDampedCurlPoint(1, 'bottom', -1000, 500, W, H)
     expect(p1.x).toBeCloseTo(W - 0.15 * 2 * W, 5)
     expect(p1.y).toBe(500)
-    // next 书末：dragOffset=-30 → x = W - 30
     expect(getDampedCurlPoint(1, 'bottom', -30, 500, W, H).x).toBe(W - 30)
-    // prev 书首：dragOffset=+1000 → x = -(W) + 0.15*2W = -0.7W
+    // prev 书首：从 -W 探入，封顶 -W+0.3W
     const p3 = getDampedCurlPoint(-1, 'bottom', 1000, 500, W, H)
     expect(p3.x).toBeCloseTo(-W + 0.15 * 2 * W, 5)
-    // prev 书首：dragOffset=+30 → x = -30
-    expect(getDampedCurlPoint(-1, 'bottom', 30, 500, W, H).x).toBe(-30)
+    expect(getDampedCurlPoint(-1, 'bottom', 30, 500, W, H).x).toBe(-W + 30)
   })
 
-  it('getCurlClickStartPoint：页角内侧 h/10', () => {
+  it('getCurlClickStartPoint：next 右缘内侧 / prev 左缘探入', () => {
     expect(getCurlClickStartPoint(1, 'bottom', W, H)).toEqual({ x: W - H / 10, y: H - H / 10 })
-    expect(getCurlClickStartPoint(-1, 'top', W, H)).toEqual({ x: W - H / 10, y: H / 10 })
+    expect(getCurlClickStartPoint(-1, 'top', W, H)).toEqual({ x: -W + H / 10, y: H / 10 })
   })
 
-  it('projectVelocityToPath：投影到路径方向并归一', () => {
+  it('projectVelocityToPath：viewport 同构投影', () => {
     const from = { x: W, y: H }
     const to = { x: -W, y: H }
-    // next：向左速度 500 → 正 t 速度
     expect(projectVelocityToPath(-500, 1, from, to)).toBeGreaterThan(0)
-    // next：向右速度 → 负
     expect(projectVelocityToPath(500, 1, from, to)).toBeLessThan(0)
-    // prev：页坐标镜像，向右速度 500 → 正 t 速度
-    expect(projectVelocityToPath(500, -1, from, to)).toBeGreaterThan(0)
-    // 零长度路径 → 0
+    // prev 放平：from=-W → to=+W，向右速度为正 t
+    expect(projectVelocityToPath(500, -1, { x: -W, y: H }, { x: W, y: H })).toBeGreaterThan(0)
     expect(projectVelocityToPath(500, 1, from, from)).toBe(0)
   })
 

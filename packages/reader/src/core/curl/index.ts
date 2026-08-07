@@ -16,6 +16,7 @@ export {
   buildFlippingBackFaceStyle,
   buildFlippingPageStyle,
   buildInnerShadowStyle,
+  buildLandedPageClipPath,
   buildOuterShadowStyle,
   curlToGlobal,
   type CurlShadowStyle
@@ -57,24 +58,29 @@ export function resolveCurlCorner(startY: number, pageHeight: number): CurlCorne
   return startY < pageHeight / 2 ? 'top' : 'bottom'
 }
 
-/** viewport 坐标 → 页坐标：next 恒等；prev 镜像（x 取负） */
-export function toCurlPagePoint(point: CurlPoint, direction: CurlDirection): CurlPoint {
-  if (direction === -1) {
-    return { x: -point.x, y: point.y }
-  }
+/**
+ * viewport 坐标 → 折角页坐标。
+ * 统一对角模型后左右滑均在 viewport/next 同构下计算，恒等映射（direction 保留兼容）。
+ */
+export function toCurlPagePoint(point: CurlPoint, _direction: CurlDirection): CurlPoint {
+  void _direction
   return { x: point.x, y: point.y }
 }
 
 /**
- * 拖拽折角点域限制（页坐标）：
- * - next：折角点不越过右缘（x ≤ pageWidth - 1）
- * - prev：页坐标 x = -viewportX ∈ [-pageWidth, 0]，不越过 -(pageWidth - 1)
+ * 拖拽折角点域限制（viewport/next 同构坐标）：
+ * x ∈ [-(pageWidth-1), pageWidth-1]，左右滑共用（prev 不再做 x 镜像）。
  */
-export function clampCurlDragPoint(point: CurlPoint, direction: CurlDirection, pageWidth: number): CurlPoint {
-  if (direction === 1) {
-    return { x: Math.min(point.x, pageWidth - 1), y: point.y }
+export function clampCurlDragPoint(
+  point: CurlPoint,
+  _direction: CurlDirection,
+  pageWidth: number
+): CurlPoint {
+  void _direction
+  return {
+    x: Math.max(-(pageWidth - 1), Math.min(pageWidth - 1, point.x)),
+    y: point.y
   }
-  return { x: Math.max(point.x, -(pageWidth - 1)), y: point.y }
 }
 
 /** 静止位（页坐标）：两方向统一为 x=+pageWidth（next=右缘平铺，prev=屏外左侧藏起） */
@@ -88,10 +94,10 @@ export function getCurlCommitPoint(corner: CurlCorner, pageWidth: number, pageHe
 }
 
 /**
- * 首末页阻尼折角点（无相邻页时的小幅折角）：
+ * 首末页阻尼折角点（无相邻页时的小幅折角；viewport/next 同构坐标）：
  * dragOffset 已过 applyGlobalDragResistance 衰减；progress 封顶 maxProgress（默认 0.15）。
- * - next（书末）：折角点 x = pageWidth + dragOffset（dragOffset ≤ 0）
- * - prev（书首）：折角点 x = -dragOffset（dragOffset ≥ 0）
+ * - next（书末）：从右缘小幅揭起，x = pageWidth + dragOffset（dragOffset ≤ 0）
+ * - prev（书首）：从左侧外小幅探入，x = -pageWidth + dragOffset（dragOffset ≥ 0）
  */
 export function getDampedCurlPoint(
   direction: CurlDirection,
@@ -107,7 +113,7 @@ export function getDampedCurlPoint(
     const x = Math.max(pageWidth - maxTravel, pageWidth + Math.min(0, dragOffset))
     return { x, y: fingerY }
   }
-  const x = Math.max(-pageWidth + maxTravel, -Math.max(0, dragOffset))
+  const x = Math.min(-pageWidth + maxTravel, -pageWidth + Math.max(0, dragOffset))
   return { x, y: corner === 'bottom' ? Math.min(fingerY, pageHeight) : fingerY }
 }
 
@@ -115,20 +121,23 @@ export function getDampedCurlPoint(
  * 点击翻页动画的起点（页坐标）：从页角内侧 margin 处掀起。
  * 与 page-flip flip() 的 showCorner 起点同款（margin = 页高 1/10）。
  */
+/**
+ * 点击翻页动画起点（viewport 同构）：
+ * - next：右缘内侧小幅揭起 → 再弹簧飞向 -pageWidth；
+ * - prev：左缘外侧小幅探入 → 再弹簧飞向 +pageWidth（向右放平）。
+ */
 export function getCurlClickStartPoint(
-  // 页坐标系下两方向统一起点（rest 点内缩 margin），参数保留以标明方向语义
-  _direction: CurlDirection,
+  direction: CurlDirection,
   corner: CurlCorner,
   pageWidth: number,
   pageHeight: number
 ): CurlPoint {
-  void _direction
   const margin = pageHeight / 10
-  const rest = getCurlRestPoint(corner, pageWidth, pageHeight)
-  return {
-    x: rest.x - margin,
-    y: corner === 'bottom' ? pageHeight - margin : margin
+  const y = corner === 'bottom' ? pageHeight - margin : margin
+  if (direction === 1) {
+    return { x: pageWidth - margin, y }
   }
+  return { x: -pageWidth + margin, y }
 }
 
 /**
@@ -137,19 +146,19 @@ export function getCurlClickStartPoint(
  */
 export function projectVelocityToPath(
   releaseVelocityX: number,
-  direction: CurlDirection,
+  _direction: CurlDirection,
   from: CurlPoint,
   to: CurlPoint
 ): number {
+  void _direction
   const dx = to.x - from.x
   const dy = to.y - from.y
   const len = Math.sqrt(dx * dx + dy * dy)
   if (len < 1e-6) {
     return 0
   }
-  // prev 方向页坐标 x 与 viewport x 反号
-  const vx = direction === -1 ? -releaseVelocityX : releaseVelocityX
-  return (vx * dx) / (len * len)
+  // viewport 同构：松手速度 x 与折角点 x 同向
+  return (releaseVelocityX * dx) / (len * len)
 }
 
 /** 路径插值：t ∈ [0,1] → 折角点 */

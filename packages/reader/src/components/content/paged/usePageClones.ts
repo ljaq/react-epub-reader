@@ -11,8 +11,8 @@
  * - 销毁：提交/回弹补间落幕 + 新规范流转正（marks ready）后由 PagedReader clearClone。
  *
  * phase-14 仿真翻页：新增第二个克隆槽（flap 槽）——
- * - next：主槽 = 下一页（底层显露区 clip），flap 槽 = 当前页折角副本（clip+transform）；
- * - prev：flap 槽 = 上一页（翻页页）；主槽仅提交落幕时挂遮盖层（两阶段转正）；
+ * - next：主槽 = 下一页（底层显露 clip），flap 槽 = 当前页折角副本；
+ * - prev：主槽 = 上一页已放平区，flap 槽 = 上一页卷边（背面）；
  * - 首末页阻尼：flap 槽 = 当前页副本（小幅折角回弹）。
  * 两槽完全独立（各自 host ref / 幂等 show/clear），cover 模式只用主槽。
  */
